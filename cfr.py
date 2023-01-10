@@ -52,9 +52,9 @@ class CFR:
         return self.curr_policy[current_player][infostate]
 
     def _get_average_strategy(self, current_player, infostate):
-        if infostate not in self.avg_policy[current_player]:
-            self.avg_policy[current_player][infostate] = defaultdict(float)
-        return self.avg_policy[current_player][infostate]
+        if infostate not in (player_policy := self.avg_policy[current_player]):
+            player_policy[infostate] = defaultdict(float)
+        return player_policy[infostate]
 
     def _get_information_state(self, current_player, state):
         infostate = state.information_state_string(current_player)

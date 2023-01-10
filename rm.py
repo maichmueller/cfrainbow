@@ -1,5 +1,6 @@
 from enum import Enum
 from functools import reduce, singledispatchmethod
+from typing import Union
 
 import pyspiel
 
@@ -120,10 +121,10 @@ def all_states_gen(
     root=None,
     include_chance_states: bool = False,
     include_terminal_states: bool = False,
-    game_name: str = "kuhn_poker",
+    game: Union[pyspiel.Game, str] = "kuhn_poker",
 ):
     if root is None:
-        root = pyspiel.load_game(game_name).new_initial_state()
+        root = (pyspiel.load_game(game) if isinstance(game, str) else game).new_initial_state()
     stack = [root]
     while stack:
         s = stack.pop()
@@ -173,7 +174,7 @@ class KuhnLeducHistoryToStr:
     def __init__(self, game_name: str = "kuhn_poker"):
         self.tensors = []
         self.strs = []
-        for state in all_states_gen(game_name=game_name):
+        for state in all_states_gen(game=game_name):
             self.tensors.append(tuple(self.istate_as_action_observation(state)))
             self.strs.append(state.information_state_string(state.current_player()))
 

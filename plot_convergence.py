@@ -2,27 +2,36 @@ import itertools
 from copy import deepcopy
 from typing import Dict, List, Optional
 
+import matplotlib.cm
 import numpy as np
 import pyspiel
+import torch
 from matplotlib import pyplot as plt
-from cfr import CFR
-from cfr_linear import LinearCFR
-from cfr_plus import CFRPlus
-from cfr_discounted import DiscountedCFR
-from cfr_exp import ExponentialCFR
+from matplotlib.collections import LineCollection
+from tqdm import tqdm
 
-from multiprocessing import Pool, freeze_support, cpu_count
+from collections import Counter, defaultdict
+from multiprocessing import Pool, cpu_count
 from open_spiel.python.algorithms import exploitability
 
+from rm import all_states_gen
 from utils import (
     to_pyspiel_tab_policy,
     print_final_policy_profile,
     print_policy_profile,
 )
 
+from cfr import CFR
+from cfr_linear import LinearCFR
+from cfr_plus import CFRPlus
+from cfr_discounted import DiscountedCFR
+from cfr_exp import ExponentialCFR
+from cfr_pure import PureCFR
+
 
 def plot_cfr_convergence(
-    algorithm_to_expl_lists: Dict[str, List[float]],
+    iters_run: int,
+    algorithm_to_expl_lists: Dict[str, List[List[float]]],
     game_name: str = "Kuhn Poker",
     save: bool = False,
     save_name: Optional[str] = None,
@@ -30,11 +39,77 @@ def plot_cfr_convergence(
     with plt.style.context("bmh"):
         max_iters = 0
         plt.figure()
+        cmap = matplotlib.cm.get_cmap("tab20")
 
-        for algo, expl_list in algorithm_to_expl_lists.items():
+        unpaired_algo_names = [
+            [full_algo_name for full_algo_name in algorithm_to_expl_lists.keys() if algo in full_algo_name][0]
+            for algo, count in Counter(
+                [
+                    name.replace("(A)", "").replace("(S)", "")
+                    for name in algorithm_to_expl_lists.keys()
+                ]
+            ).items()
+            if count == 1
+        ]
+        unpaired_algo_list = sorted(
+            [(algo, algorithm_to_expl_lists.pop(algo)) for algo in unpaired_algo_names],
+            key=lambda x: x[0],
+        )
+        algorithm_to_expl_lists = (
+            sorted(list(algorithm_to_expl_lists.items()), key=lambda x: x[0])
+            + unpaired_algo_list
+        )
+
+        x = np.arange(1, iters_run+1)
+
+        for i, (algo, expl_list) in enumerate(algorithm_to_expl_lists):
             max_iters = max(max_iters, len(expl_list))
             linestyle = "--" if "(A)" in algo else "-"
-            plt.plot(expl_list, label=algo, linewidth=0.75, linestyle=linestyle)
+            color = cmap(i)
+            if len(expl_list) == 1:
+                plt.plot(
+
+                    expl_list,
+                    label=algo,
+                    linewidth=0.75,
+                    linestyle=linestyle,
+                    color=color,
+                )
+            else:
+                iteration_counts = np.flip(np.sort(np.asarray([len(vals) for vals in expl_list])), 0)
+                iter_beginnings = iters_run - iteration_counts
+                freq_arr = np.asarray(sorted(Counter(iter_beginnings).items(), key=lambda x: x[0]), dtype=float)
+                absolute_freq = np.cumsum(freq_arr, axis=0)[:, 1]
+                relative_freq = absolute_freq / len(expl_list)
+                iter_buckets = freq_arr[:, 0]
+
+                iter_to_bucket = np.searchsorted(iter_buckets, x)
+
+                alphas = relative_freq[iter_to_bucket]
+                torch.nn.utils.rnn.pad_sequence([torch.Tensor(list(reversed(a))) for a in expl_list], batch_first=True).flip(
+                    dims=(1,)).sum(dim=0)
+                x = np.arange(0, n_iters)
+                points = np.array([x, y]).T.reshape(-1, 1, 2)
+                segments = np.concatenate([points[:-1], points[1:]], axis=1)
+                lc = LineCollection(segments, linewidths=lwidths, color='blue', alpha=lwidths / lwidths.max())
+                as_matrix = np.asarray(expl_list)
+                lower_quantile_band, upper_quantile_band = np.quantile(
+                    as_matrix, q=[0.25, 0.75], axis=0
+                )
+                mean_band = np.mean(as_matrix, axis=0)
+                plt.plot(
+                    mean_band,
+                    label=algo,
+                    linewidth=0.75,
+                    linestyle=linestyle,
+                    color=color,
+                )
+                plt.fill_between(
+                    np.arange(as_matrix.shape[1]),
+                    lower_quantile_band,
+                    upper_quantile_band,
+                    color=color,
+                )
 
         plt.xlabel("Iteration")
         plt.ylabel("Exploitability")
@@ -73,25 +148,42 @@ def main(
             f"Running class {cfr_class.__name__} with kwargs {kwargs} for {n_iter} iterations."
         )
 
-    expl_values = []
     game = pyspiel.load_game(game_name)
     root_state = game.new_initial_state()
+    all_infostates = {
+        state.information_state_string(state.current_player())
+        for state in all_states_gen(root=root_state.clone())
+    }
+    n_infostates = len(all_infostates)
     n_players = list(range(root_state.num_players()))
-    current_policies = [{} for _ in n_players]
-    average_policies = [{} for _ in n_players]
+
     solver = cfr_class(
-        root_state, current_policies, average_policies, **kwargs, verbose=do_print,
+        root_state,
+        curr_policy_list=[{} for _ in n_players],
+        average_policy_list=[{} for _ in n_players],
+        verbose=do_print,
+        **kwargs,
     )
     simultaneous_updates = kwargs.get("simultaneous_updates", False)
+
+    return run_solver(
+        solver, n_iter, game, game_name, simultaneous_updates, n_infostates, do_print,
+    )
+
+
+def run_solver(
+    solver, n_iter, game, game_name, simultaneous_updates, n_infostates, do_print
+):
+    expl_values = []
     for i in range(n_iter):
         solver.iterate()
 
-        if simultaneous_updates or (not simultaneous_updates and i > 1):
+        if sum(map(lambda p: len(p), solver.average_policy())) == n_infostates and (
+            simultaneous_updates or (not simultaneous_updates and i > 1)
+        ):
             avg_policy = solver.average_policy()
             expl_values.append(
-                exploitability.exploitability(
-                    game, to_pyspiel_tab_policy(avg_policy),
-                )
+                exploitability.exploitability(game, to_pyspiel_tab_policy(avg_policy),)
             )
 
             if do_print:
@@ -106,7 +198,6 @@ def main(
                     )
     if do_print and game_name == "kuhn_poker":
         print_final_policy_profile(solver.average_policy())
-
     return expl_values
 
 
@@ -120,107 +211,184 @@ if __name__ == "__main__":
     verbose = False
     game = "kuhn_poker"
     # game = "leduc_poker"
-    with Pool(processes=cpu_count()) as pool:
-        jobs = {
-            "CFR (A)": (
-                CFR,
-                n_iters,
-                {"game_name": game, "simultaneous_updates": False, "do_print": verbose},
-            ),
-            "CFR (S)": (
-                CFR,
-                n_iters,
-                {"game_name": game, "simultaneous_updates": True, "do_print": verbose},
-            ),
-            "Exp. CFR (A)": (
-                CFR,
-                n_iters,
-                {"game_name": game, "simultaneous_updates": False, "do_print": verbose},
-            ),
-            "Exp. CFR (S)": (
-                CFR,
-                n_iters,
-                {"game_name": game, "simultaneous_updates": True, "do_print": verbose},
-            ),
-            "CFR+.": (CFRPlus, n_iters, {"game_name": game, "do_print": verbose}),
-            "Disc. CFR (A)": (
-                DiscountedCFR,
-                n_iters,
-                {"game_name": game, "simultaneous_updates": False, "do_print": verbose},
-            ),
-            "Disc. CFR (S)": (
-                DiscountedCFR,
-                n_iters,
-                {"game_name": game, "simultaneous_updates": True, "do_print": verbose},
-            ),
-            "Disc. CFR+ (A)": (
-                DiscountedCFR,
-                n_iters,
-                {
-                    "game_name": game,
-                    "simultaneous_updates": False,
-                    "do_regret_matching_plus": True,
-                    "do_print": verbose,
-                },
-            ),
-            "Disc. CFR+ (S)": (
-                DiscountedCFR,
-                n_iters,
-                {
-                    "game_name": game,
-                    "simultaneous_updates": True,
-                    "do_regret_matching_plus": True,
-                    "do_print": verbose,
-                },
-            ),
-            "Lin. CFR (A)": (
-                LinearCFR,
-                n_iters,
-                {"game_name": game, "simultaneous_updates": False, "do_print": verbose},
-            ),
-            "Lin. CFR (S)": (
-                LinearCFR,
-                n_iters,
-                {"game_name": game, "simultaneous_updates": True, "do_print": verbose},
-            ),
-            "Lin. CFR+ (A)": (
-                LinearCFR,
-                n_iters,
-                {
-                    "game_name": game,
-                    "simultaneous_updates": False,
-                    "do_regret_matching_plus": True,
-                    "do_print": verbose,
-                },
-            ),
-            "Lin. CFR+ (S)": (
-                LinearCFR,
-                n_iters,
-                {
-                    "game_name": game,
-                    "simultaneous_updates": True,
-                    "do_regret_matching_plus": True,
-                    "do_print": verbose,
-                },
-            ),
-        }
-        results = pool.map_async(
-            main_wrapper,
-            [
-                (name, args_and_kwargs[:-1], args_and_kwargs[-1])
-                for name, args_and_kwargs in jobs.items()
-            ],
+    rng = np.random.default_rng(0)
+    stochastic_seeds = 20
+    n_cpu = cpu_count()
+    with Pool(processes=n_cpu) as pool:
+        jobs = list(
+            {
+                "CFR (A)": (
+                    CFR,
+                    n_iters,
+                    {
+                        "game_name": game,
+                        "simultaneous_updates": False,
+                        "do_print": verbose,
+                    },
+                ),
+                "CFR (S)": (
+                    CFR,
+                    n_iters,
+                    {
+                        "game_name": game,
+                        "simultaneous_updates": True,
+                        "do_print": verbose,
+                    },
+                ),
+                "Exp. CFR (A)": (
+                    ExponentialCFR,
+                    n_iters,
+                    {
+                        "game_name": game,
+                        "simultaneous_updates": False,
+                        "do_print": verbose,
+                    },
+                ),
+                "Exp. CFR (S)": (
+                    ExponentialCFR,
+                    n_iters,
+                    {
+                        "game_name": game,
+                        "simultaneous_updates": True,
+                        "do_print": verbose,
+                    },
+                ),
+                "Pure CFR (A)": (
+                    PureCFR,
+                    n_iters,
+                    {
+                        "game_name": game,
+                        "stochastic_solver": True,
+                        "simultaneous_updates": False,
+                        "do_print": verbose,
+                    },
+                ),
+                "Pure CFR (S)": (
+                    PureCFR,
+                    n_iters,
+                    {
+                        "game_name": game,
+                        "stochastic_solver": True,
+                        "simultaneous_updates": True,
+                        "do_print": verbose,
+                    },
+                ),
+                "CFR+ (A)": (
+                    CFRPlus,
+                    n_iters,
+                    {"game_name": game, "do_print": verbose},
+                ),
+                "Disc. CFR (A)": (
+                    DiscountedCFR,
+                    n_iters,
+                    {
+                        "game_name": game,
+                        "simultaneous_updates": False,
+                        "do_print": verbose,
+                    },
+                ),
+                "Disc. CFR (S)": (
+                    DiscountedCFR,
+                    n_iters,
+                    {
+                        "game_name": game,
+                        "simultaneous_updates": True,
+                        "do_print": verbose,
+                    },
+                ),
+                "Disc. CFR+ (A)": (
+                    DiscountedCFR,
+                    n_iters,
+                    {
+                        "game_name": game,
+                        "simultaneous_updates": False,
+                        "do_regret_matching_plus": True,
+                        "do_print": verbose,
+                    },
+                ),
+                "Disc. CFR+ (S)": (
+                    DiscountedCFR,
+                    n_iters,
+                    {
+                        "game_name": game,
+                        "simultaneous_updates": True,
+                        "do_regret_matching_plus": True,
+                        "do_print": verbose,
+                    },
+                ),
+                "Lin. CFR (A)": (
+                    LinearCFR,
+                    n_iters,
+                    {
+                        "game_name": game,
+                        "simultaneous_updates": False,
+                        "do_print": verbose,
+                    },
+                ),
+                "Lin. CFR (S)": (
+                    LinearCFR,
+                    n_iters,
+                    {
+                        "game_name": game,
+                        "simultaneous_updates": True,
+                        "do_print": verbose,
+                    },
+                ),
+                "Lin. CFR+ (A)": (
+                    LinearCFR,
+                    n_iters,
+                    {
+                        "game_name": game,
+                        "simultaneous_updates": False,
+                        "do_regret_matching_plus": True,
+                        "do_print": verbose,
+                    },
+                ),
+                "Lin. CFR+ (S)": (
+                    LinearCFR,
+                    n_iters,
+                    {
+                        "game_name": game,
+                        "simultaneous_updates": True,
+                        "do_regret_matching_plus": True,
+                        "do_print": verbose,
+                    },
+                ),
+            }.items()
         )
-        expl_dict = {}
-        for result in results.get():
-            name, values = result
-            expl_dict[name] = values
+        augmented_jobs = []
+        for alg, args in jobs:
+            kwargs = args[-1]
+            if kwargs.pop("stochastic_solver", False):
+                augmented_jobs.extend(
+                    [
+                        (alg, args[:-1] + (kwargs | {"seed": seed},))
+                        for seed in rng.integers(0, int(1e6), size=stochastic_seeds)
+                    ]
+                )
+            else:
+                augmented_jobs.append((alg, args))
+        results = pool.imap_unordered(
+            main_wrapper,
+            (
+                (name, args_and_kwargs[:-1], args_and_kwargs[-1])
+                for (name, args_and_kwargs) in augmented_jobs
+            ),
+        )
+        expl_dict = defaultdict(list)
+
+        with tqdm(total=len(augmented_jobs), desc=f"Running CFR variants in multiprocess on {n_cpu} cpus") as pbar:
+            for result in results:
+                pbar.update()
+                name, values = result
+                expl_dict[name].append(values)
 
     averaged_values = {
-        name: running_mean(expl_values, window_size=20)
+        name: [running_mean(values, window_size=20) for values in expl_values]
         for name, expl_values in expl_dict.items()
     }
     plot_cfr_convergence(
+        n_iters,
         averaged_values,
         game_name=" ".join([s.capitalize() for s in game.split("_")]),
         save=True,

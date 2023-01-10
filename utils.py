@@ -6,6 +6,8 @@ import pyspiel
 
 import rm
 
+import numba
+
 
 def to_pyspiel_tab_policy(policy_list):
     return pyspiel.TabularPolicy(
@@ -15,13 +17,19 @@ def to_pyspiel_tab_policy(policy_list):
                 for action, prob in as_and_ps.items()
             ]
             for istate, as_and_ps in itertools.chain(
-            policy_list[0].items(), policy_list[1].items()
-        )
+                policy_list[0].items(), policy_list[1].items()
+            )
         }
     )
 
 
-def print_policy_profile(policy_profile: List[Dict[str, Dict[int, float]]], normalize: bool = True):
+def sample_on_policy(values, policy, rng):
+    return rng.choice(values, p=policy)
+
+
+def print_policy_profile(
+    policy_profile: List[Dict[str, Dict[int, float]]], normalize: bool = True
+):
     for player, player_policy in enumerate(policy_profile):
         for infostate, policy in player_policy.items():
             prob_sum = 0.0
