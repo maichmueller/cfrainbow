@@ -1,13 +1,15 @@
 import itertools
+import os
 from copy import deepcopy
 from typing import Dict, List, Optional
-
+import pickle
 import matplotlib.cm
 import numpy as np
 import pyspiel
 import torch
 from matplotlib import pyplot as plt
 from matplotlib.collections import LineCollection
+from matplotlib.lines import Line2D
 from tqdm import tqdm
 
 from collections import Counter, defaultdict
@@ -42,7 +44,11 @@ def plot_cfr_convergence(
         cmap = matplotlib.cm.get_cmap("tab20")
 
         unpaired_algo_names = [
-            [full_algo_name for full_algo_name in algorithm_to_expl_lists.keys() if algo in full_algo_name][0]
+            [
+                full_algo_name
+                for full_algo_name in algorithm_to_expl_lists.keys()
+                if algo in full_algo_name
+            ][0]
             for algo, count in Counter(
                 [
                     name.replace("(A)", "").replace("(S)", "")
@@ -59,63 +65,144 @@ def plot_cfr_convergence(
             sorted(list(algorithm_to_expl_lists.items()), key=lambda x: x[0])
             + unpaired_algo_list
         )
-
-        x = np.arange(1, iters_run+1)
-
+        dash_pattern = matplotlib.rcParams['lines.dashed_pattern']
+        linewidth = 1
+        x = np.arange(1, iters_run + 1)
+        fig, ax = plt.subplots(figsize=(8, 10))
+        manual_legend_handles = []
         for i, (algo, expl_list) in enumerate(algorithm_to_expl_lists):
             max_iters = max(max_iters, len(expl_list))
             linestyle = "--" if "(A)" in algo else "-"
             color = cmap(i)
             if len(expl_list) == 1:
-                plt.plot(
-
-                    expl_list,
+                plotline, = ax.plot(
+                    x[iters_run - len(expl_list[0]) :],
+                    expl_list[0],
                     label=algo,
-                    linewidth=0.75,
+                    linewidth=linewidth,
                     linestyle=linestyle,
                     color=color,
                 )
             else:
-                iteration_counts = np.flip(np.sort(np.asarray([len(vals) for vals in expl_list])), 0)
+                iteration_counts = np.flip(
+                    np.sort(np.asarray([len(vals) for vals in expl_list])), 0
+                )
                 iter_beginnings = iters_run - iteration_counts
-                freq_arr = np.asarray(sorted(Counter(iter_beginnings).items(), key=lambda x: x[0]), dtype=float)
+                freq_arr = np.asarray(
+                    sorted(Counter(iter_beginnings).items(), key=lambda x: x[0]),
+                    dtype=float,
+                )
                 absolute_freq = np.cumsum(freq_arr, axis=0)[:, 1]
                 relative_freq = absolute_freq / len(expl_list)
-                iter_buckets = freq_arr[:, 0]
+                iter_buckets = freq_arr[:, 0].astype(int)
 
-                iter_to_bucket = np.searchsorted(iter_buckets, x)
-
-                alphas = relative_freq[iter_to_bucket]
-                torch.nn.utils.rnn.pad_sequence([torch.Tensor(list(reversed(a))) for a in expl_list], batch_first=True).flip(
-                    dims=(1,)).sum(dim=0)
-                x = np.arange(0, n_iters)
-                points = np.array([x, y]).T.reshape(-1, 1, 2)
-                segments = np.concatenate([points[:-1], points[1:]], axis=1)
-                lc = LineCollection(segments, linewidths=lwidths, color='blue', alpha=lwidths / lwidths.max())
-                as_matrix = np.asarray(expl_list)
-                lower_quantile_band, upper_quantile_band = np.quantile(
-                    as_matrix, q=[0.25, 0.75], axis=0
+                iter_to_bucket = (
+                    np.searchsorted(
+                        iter_buckets,
+                        x - 1,  # x is the 'logical' x scale to plot (iteration 1...T),
+                        # but values are index starting from 0, so -1 to get the index scale
+                        side="right",
+                    )
+                    - 1
                 )
-                mean_band = np.mean(as_matrix, axis=0)
-                plt.plot(
-                    mean_band,
+                no_value_mask = iter_to_bucket == -1
+                no_value_iters = x[no_value_mask]
+
+                absolute_freq_per_iter = np.concatenate(
+                    [
+                        np.zeros(no_value_iters.size),
+                        absolute_freq[iter_to_bucket[~no_value_mask]],
+                    ]
+                )
+                relative_freq_per_iter = np.concatenate(
+                    [
+                        np.zeros(no_value_iters.size),
+                        relative_freq[iter_to_bucket[~no_value_mask]],
+                    ]
+                )
+
+                padded_iter_values_matrix = (
+                    torch.nn.utils.rnn.pad_sequence(
+                        [  # full-length zeros tensor to force padding for the entire run_iters length
+                            torch.zeros(iters_run)
+                        ]
+                        + [torch.Tensor(list(reversed(a))) for a in expl_list],
+                        batch_first=True,
+                    )
+                    .flip(dims=(1,))
+                    .numpy()
+                )
+                nanpadded_iter_values_matrix = np.where(
+                    padded_iter_values_matrix == 0, np.nan, padded_iter_values_matrix
+                )
+                sum_band = padded_iter_values_matrix.sum(axis=0)
+                mean_band = sum_band / absolute_freq_per_iter
+                stderr = np.nanstd(
+                    nanpadded_iter_values_matrix, ddof=1, axis=0
+                ) / np.sqrt(np.isnan(nanpadded_iter_values_matrix).sum(axis=0))
+
+                nan_mask = np.isnan(mean_band)
+                x_to_plot = (x - 1)[~nan_mask] + 1
+                # repackage the x, y data points as a list of 2D coordinates
+                mean_to_plot = mean_band[~nan_mask]
+                stderr_to_plot = stderr[~nan_mask]
+                # interp_xspace = np.linspace(x_to_plot[0], iters_run, iters_run * 10)
+                # interp_mean = np.interp(interp_xspace, x_to_plot, mean_to_plot)
+                # interp_alpha = np.interp(interp_xspace, x_to_plot, relative_freq[iter_to_bucket[~no_value_mask]])
+                # points = np.array([interp_xspace, interp_mean]).T.reshape(-1, 1, 2)
+                points = np.array([x_to_plot, mean_to_plot]).T.reshape(-1, 1, 2)
+                # we build a line collection which plots individual lines defined by a starting coordinate (x1,y1)
+                # and a target coordinate (x2,y2). Thus, in order to make our function points y plotted, we interleave
+                # our y points by having each coordinate point to its next coordinate as target. We then transform like:
+                #    ([x1,y1],       (([x1,y1],[x2,y2]),
+                #     [x2,y2],        ([x2,y2],[x3,y3]),
+                #     [x3,y3],  -->   ([x3,y3],[x4,y4]),
+                #     [x4,y4],        ([x4,y4],[x5,y5]))
+                #     [x5,y5])
+                segments = np.concatenate([points[:-1], points[1:]], axis=1)
+                if linestyle == "--":
+                    lc = LineCollection(
+                        [s for i, s in enumerate(segments)],
+                        linewidths=relative_freq_per_iter * linewidth,
+                        color=color,
+                        alpha=relative_freq_per_iter,
+                    )
+                    ax.add_collection(lc)
+                else:
+                    lc = LineCollection(
+                        segments,
+                        linestyles=linestyle,
+                        linewidths=relative_freq_per_iter * linewidth,
+                        color=color,
+                        alpha=relative_freq_per_iter ** 2,
+                    )
+                    ax.add_collection(lc)
+                # this plot is only here to add the legend entry
+                line = Line2D(
+                    [0],
+                    [0],
                     label=algo,
-                    linewidth=0.75,
+                    linewidth=linewidth,
                     linestyle=linestyle,
                     color=color,
                 )
-                plt.fill_between(
-                    np.arange(as_matrix.shape[1]),
-                    lower_quantile_band,
-                    upper_quantile_band,
+                manual_legend_handles.append(line)
+                #
+                fill_area_polygon = ax.fill_between(
+                    x_to_plot,
+                    mean_to_plot - stderr_to_plot,
+                    mean_to_plot + stderr_to_plot,
                     color=color,
+                    alpha=0.1,
                 )
 
-        plt.xlabel("Iteration")
-        plt.ylabel("Exploitability")
-        plt.yscale("log", base=10)
-        plt.title(f"Convergence to Nash Equilibrium in {game_name}")
-        plt.legend(
+        ax.set_xlabel("Iteration")
+        ax.set_ylabel("Exploitability")
+        ax.set_yscale("log", base=10)
+        ax.set_title(f"Convergence to Nash Equilibrium in {game_name}")
+        manual_legend_handles.extend(ax.get_legend_handles_labels()[0])
+        ax.legend(
+            handles=manual_legend_handles,
             loc="upper center",
             bbox_to_anchor=(0.5, -0.1),
             fancybox=True,
@@ -126,7 +213,7 @@ def plot_cfr_convergence(
         if not save:
             plt.show(bbox_inches="tight")
         else:
-            plt.savefig(f"{save_name}_iters_{max_iters}.pdf", bbox_inches="tight")
+            plt.savefig(f"{save_name}_iters_{iters_run}.png", bbox_inches="tight")
 
 
 def running_mean(values, window_size: int = 10):
@@ -167,7 +254,13 @@ def main(
     simultaneous_updates = kwargs.get("simultaneous_updates", False)
 
     return run_solver(
-        solver, n_iter, game, game_name, simultaneous_updates, n_infostates, do_print,
+        solver,
+        n_iter,
+        game,
+        game_name,
+        simultaneous_updates,
+        n_infostates,
+        do_print,
     )
 
 
@@ -183,7 +276,10 @@ def run_solver(
         ):
             avg_policy = solver.average_policy()
             expl_values.append(
-                exploitability.exploitability(game, to_pyspiel_tab_policy(avg_policy),)
+                exploitability.exploitability(
+                    game,
+                    to_pyspiel_tab_policy(avg_policy),
+                )
             )
 
             if do_print:
@@ -212,177 +308,187 @@ if __name__ == "__main__":
     game = "kuhn_poker"
     # game = "leduc_poker"
     rng = np.random.default_rng(0)
-    stochastic_seeds = 20
+    stochastic_seeds = 100
     n_cpu = cpu_count()
-    with Pool(processes=n_cpu) as pool:
-        jobs = list(
-            {
-                "CFR (A)": (
-                    CFR,
-                    n_iters,
-                    {
-                        "game_name": game,
-                        "simultaneous_updates": False,
-                        "do_print": verbose,
-                    },
+    filename = "testdata.pkl"
+    if not os.path.exists(os.path.join(".", filename)):
+        with Pool(processes=n_cpu) as pool:
+            jobs = list(
+                {
+                    "CFR (A)": (
+                        CFR,
+                        n_iters,
+                        {
+                            "game_name": game,
+                            "simultaneous_updates": False,
+                            "do_print": verbose,
+                        },
+                    ),
+                    "CFR (S)": (
+                        CFR,
+                        n_iters,
+                        {
+                            "game_name": game,
+                            "simultaneous_updates": True,
+                            "do_print": verbose,
+                        },
+                    ),
+                    "Exp. CFR (A)": (
+                        ExponentialCFR,
+                        n_iters,
+                        {
+                            "game_name": game,
+                            "simultaneous_updates": False,
+                            "do_print": verbose,
+                        },
+                    ),
+                    "Exp. CFR (S)": (
+                        ExponentialCFR,
+                        n_iters,
+                        {
+                            "game_name": game,
+                            "simultaneous_updates": True,
+                            "do_print": verbose,
+                        },
+                    ),
+                    "Pure CFR (A)": (
+                        PureCFR,
+                        n_iters,
+                        {
+                            "game_name": game,
+                            "stochastic_solver": True,
+                            "simultaneous_updates": False,
+                            "do_print": verbose,
+                        },
+                    ),
+                    "Pure CFR (S)": (
+                        PureCFR,
+                        n_iters,
+                        {
+                            "game_name": game,
+                            "stochastic_solver": True,
+                            "simultaneous_updates": True,
+                            "do_print": verbose,
+                        },
+                    ),
+                    "CFR+ (A)": (
+                        CFRPlus,
+                        n_iters,
+                        {"game_name": game, "do_print": verbose},
+                    ),
+                    "Disc. CFR (A)": (
+                        DiscountedCFR,
+                        n_iters,
+                        {
+                            "game_name": game,
+                            "simultaneous_updates": False,
+                            "do_print": verbose,
+                        },
+                    ),
+                    "Disc. CFR (S)": (
+                        DiscountedCFR,
+                        n_iters,
+                        {
+                            "game_name": game,
+                            "simultaneous_updates": True,
+                            "do_print": verbose,
+                        },
+                    ),
+                    "Disc. CFR+ (A)": (
+                        DiscountedCFR,
+                        n_iters,
+                        {
+                            "game_name": game,
+                            "simultaneous_updates": False,
+                            "do_regret_matching_plus": True,
+                            "do_print": verbose,
+                        },
+                    ),
+                    "Disc. CFR+ (S)": (
+                        DiscountedCFR,
+                        n_iters,
+                        {
+                            "game_name": game,
+                            "simultaneous_updates": True,
+                            "do_regret_matching_plus": True,
+                            "do_print": verbose,
+                        },
+                    ),
+                    "Lin. CFR (A)": (
+                        LinearCFR,
+                        n_iters,
+                        {
+                            "game_name": game,
+                            "simultaneous_updates": False,
+                            "do_print": verbose,
+                        },
+                    ),
+                    "Lin. CFR (S)": (
+                        LinearCFR,
+                        n_iters,
+                        {
+                            "game_name": game,
+                            "simultaneous_updates": True,
+                            "do_print": verbose,
+                        },
+                    ),
+                    "Lin. CFR+ (A)": (
+                        LinearCFR,
+                        n_iters,
+                        {
+                            "game_name": game,
+                            "simultaneous_updates": False,
+                            "do_regret_matching_plus": True,
+                            "do_print": verbose,
+                        },
+                    ),
+                    "Lin. CFR+ (S)": (
+                        LinearCFR,
+                        n_iters,
+                        {
+                            "game_name": game,
+                            "simultaneous_updates": True,
+                            "do_regret_matching_plus": True,
+                            "do_print": verbose,
+                        },
+                    ),
+                }.items()
+            )
+            augmented_jobs = []
+            for alg, args in jobs:
+                kwargs = args[-1]
+                if kwargs.pop("stochastic_solver", False):
+                    augmented_jobs.extend(
+                        [
+                            (alg, args[:-1] + (kwargs | {"seed": seed},))
+                            for seed in rng.integers(0, int(1e6), size=stochastic_seeds)
+                        ]
+                    )
+                else:
+                    augmented_jobs.append((alg, args))
+            results = pool.imap_unordered(
+                main_wrapper,
+                (
+                    (name, args_and_kwargs[:-1], args_and_kwargs[-1])
+                    for (name, args_and_kwargs) in augmented_jobs
                 ),
-                "CFR (S)": (
-                    CFR,
-                    n_iters,
-                    {
-                        "game_name": game,
-                        "simultaneous_updates": True,
-                        "do_print": verbose,
-                    },
-                ),
-                "Exp. CFR (A)": (
-                    ExponentialCFR,
-                    n_iters,
-                    {
-                        "game_name": game,
-                        "simultaneous_updates": False,
-                        "do_print": verbose,
-                    },
-                ),
-                "Exp. CFR (S)": (
-                    ExponentialCFR,
-                    n_iters,
-                    {
-                        "game_name": game,
-                        "simultaneous_updates": True,
-                        "do_print": verbose,
-                    },
-                ),
-                "Pure CFR (A)": (
-                    PureCFR,
-                    n_iters,
-                    {
-                        "game_name": game,
-                        "stochastic_solver": True,
-                        "simultaneous_updates": False,
-                        "do_print": verbose,
-                    },
-                ),
-                "Pure CFR (S)": (
-                    PureCFR,
-                    n_iters,
-                    {
-                        "game_name": game,
-                        "stochastic_solver": True,
-                        "simultaneous_updates": True,
-                        "do_print": verbose,
-                    },
-                ),
-                "CFR+ (A)": (
-                    CFRPlus,
-                    n_iters,
-                    {"game_name": game, "do_print": verbose},
-                ),
-                "Disc. CFR (A)": (
-                    DiscountedCFR,
-                    n_iters,
-                    {
-                        "game_name": game,
-                        "simultaneous_updates": False,
-                        "do_print": verbose,
-                    },
-                ),
-                "Disc. CFR (S)": (
-                    DiscountedCFR,
-                    n_iters,
-                    {
-                        "game_name": game,
-                        "simultaneous_updates": True,
-                        "do_print": verbose,
-                    },
-                ),
-                "Disc. CFR+ (A)": (
-                    DiscountedCFR,
-                    n_iters,
-                    {
-                        "game_name": game,
-                        "simultaneous_updates": False,
-                        "do_regret_matching_plus": True,
-                        "do_print": verbose,
-                    },
-                ),
-                "Disc. CFR+ (S)": (
-                    DiscountedCFR,
-                    n_iters,
-                    {
-                        "game_name": game,
-                        "simultaneous_updates": True,
-                        "do_regret_matching_plus": True,
-                        "do_print": verbose,
-                    },
-                ),
-                "Lin. CFR (A)": (
-                    LinearCFR,
-                    n_iters,
-                    {
-                        "game_name": game,
-                        "simultaneous_updates": False,
-                        "do_print": verbose,
-                    },
-                ),
-                "Lin. CFR (S)": (
-                    LinearCFR,
-                    n_iters,
-                    {
-                        "game_name": game,
-                        "simultaneous_updates": True,
-                        "do_print": verbose,
-                    },
-                ),
-                "Lin. CFR+ (A)": (
-                    LinearCFR,
-                    n_iters,
-                    {
-                        "game_name": game,
-                        "simultaneous_updates": False,
-                        "do_regret_matching_plus": True,
-                        "do_print": verbose,
-                    },
-                ),
-                "Lin. CFR+ (S)": (
-                    LinearCFR,
-                    n_iters,
-                    {
-                        "game_name": game,
-                        "simultaneous_updates": True,
-                        "do_regret_matching_plus": True,
-                        "do_print": verbose,
-                    },
-                ),
-            }.items()
-        )
-        augmented_jobs = []
-        for alg, args in jobs:
-            kwargs = args[-1]
-            if kwargs.pop("stochastic_solver", False):
-                augmented_jobs.extend(
-                    [
-                        (alg, args[:-1] + (kwargs | {"seed": seed},))
-                        for seed in rng.integers(0, int(1e6), size=stochastic_seeds)
-                    ]
-                )
-            else:
-                augmented_jobs.append((alg, args))
-        results = pool.imap_unordered(
-            main_wrapper,
-            (
-                (name, args_and_kwargs[:-1], args_and_kwargs[-1])
-                for (name, args_and_kwargs) in augmented_jobs
-            ),
-        )
-        expl_dict = defaultdict(list)
+            )
+            expl_dict = defaultdict(list)
 
-        with tqdm(total=len(augmented_jobs), desc=f"Running CFR variants in multiprocess on {n_cpu} cpus") as pbar:
-            for result in results:
-                pbar.update()
-                name, values = result
-                expl_dict[name].append(values)
+            with tqdm(
+                total=len(augmented_jobs),
+                desc=f"Running CFR variants in multiprocess on {n_cpu} cpus",
+            ) as pbar:
+                for result in results:
+                    pbar.update()
+                    name, values = result
+                    expl_dict[name].append(values)
 
+        with open(os.path.join(".", filename), "wb") as file:
+            pickle.dump(expl_dict, file)
+    else:
+        with open(os.path.join(".", filename), "rb") as file:
+            expl_dict = pickle.load(file)
     averaged_values = {
         name: [running_mean(values, window_size=20) for values in expl_values]
         for name, expl_values in expl_dict.items()
