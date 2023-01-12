@@ -53,7 +53,7 @@ class CFR:
             return self.avg_policy
         else:
             return [self.avg_policy[player]]
-        
+
     def _get_current_strategy(self, current_player, infostate):
         return self.curr_policy[current_player][infostate]
 

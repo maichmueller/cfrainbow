@@ -16,6 +16,9 @@ from collections import Counter, defaultdict
 from multiprocessing import Pool, cpu_count
 from open_spiel.python.algorithms import exploitability
 
+from cfr_monte_carlo_chance_sampling import ChanceSamplingCFR
+from cfr_monte_carlo_external_sampling import ExternalSamplingMCCFR
+from cfr_monte_carlo_outcome_sampling import OutcomeSamplingMCCFR
 from rm import all_states_gen
 from utils import (
     to_pyspiel_tab_policy,
@@ -65,7 +68,7 @@ def plot_cfr_convergence(
             sorted(list(algorithm_to_expl_lists.items()), key=lambda x: x[0])
             + unpaired_algo_list
         )
-        dash_pattern = matplotlib.rcParams['lines.dashed_pattern']
+        dash_pattern = matplotlib.rcParams["lines.dashed_pattern"]
         linewidth = 1
         x = np.arange(1, iters_run + 1)
         fig, ax = plt.subplots(figsize=(8, 10))
@@ -75,7 +78,7 @@ def plot_cfr_convergence(
             linestyle = "--" if "(A)" in algo else "-"
             color = cmap(i)
             if len(expl_list) == 1:
-                plotline, = ax.plot(
+                (plotline,) = ax.plot(
                     x[iters_run - len(expl_list[0]) :],
                     expl_list[0],
                     label=algo,
@@ -174,7 +177,7 @@ def plot_cfr_convergence(
                         linestyles=linestyle,
                         linewidths=relative_freq_per_iter * linewidth,
                         color=color,
-                        alpha=relative_freq_per_iter ** 2,
+                        alpha=relative_freq_per_iter**2,
                     )
                     ax.add_collection(lc)
                 # this plot is only here to add the legend entry
@@ -363,6 +366,58 @@ if __name__ == "__main__":
                     ),
                     "Pure CFR (S)": (
                         PureCFR,
+                        n_iters,
+                        {
+                            "game_name": game,
+                            "stochastic_solver": True,
+                            "simultaneous_updates": True,
+                            "do_print": verbose,
+                        },
+                    ),
+                    "OS-MCCFR (A)": (
+                        OutcomeSamplingMCCFR,
+                        n_iters,
+                        {
+                            "game_name": game,
+                            "stochastic_solver": True,
+                            "weighting_mode": 2,
+                            "simultaneous_updates": False,
+                            "do_print": verbose,
+                        },
+                    ),
+                    "OS-MCCFR (S)": (
+                        OutcomeSamplingMCCFR,
+                        n_iters,
+                        {
+                            "game_name": game,
+                            "stochastic_solver": True,
+                            "weighting_mode": 2,
+                            "simultaneous_updates": True,
+                            "do_print": verbose,
+                        },
+                    ),
+                    "ES-MCCFR (A)": (
+                        ExternalSamplingMCCFR,
+                        n_iters,
+                        {
+                            "game_name": game,
+                            "stochastic_solver": True,
+                            "simultaneous_updates": False,
+                            "do_print": verbose,
+                        },
+                    ),
+                    "CS-MCCFR (A)": (
+                        ChanceSamplingCFR,
+                        n_iters,
+                        {
+                            "game_name": game,
+                            "stochastic_solver": True,
+                            "simultaneous_updates": False,
+                            "do_print": verbose,
+                        },
+                    ),
+                    "CS-MCCFR (S)": (
+                        ChanceSamplingCFR,
                         n_iters,
                         {
                             "game_name": game,
