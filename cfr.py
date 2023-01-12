@@ -48,6 +48,12 @@ class CFR:
         self._simultaneous_updates = simultaneous_updates
         self._verbose = verbose
 
+    def average_policy(self, player: Optional[int] = None):
+        if player is None:
+            return self.avg_policy
+        else:
+            return [self.avg_policy[player]]
+        
     def _get_current_strategy(self, current_player, infostate):
         return self.curr_policy[current_player][infostate]
 
@@ -127,21 +133,6 @@ class CFR:
                 )
             return state_value
 
-    def _update_regret_and_avg_strategy(
-        self, action_values, state_value, reach_prob, infostate, curr_player
-    ):
-        player_reach_prob = reach_prob[curr_player]
-        cf_reach_prob = counterfactual_reach_prob(reach_prob, curr_player)
-        # fetch the infostate specific policy tables for the current player
-        avg_policy = self._get_average_strategy(curr_player, infostate)
-        curr_policy = self._get_current_strategy(curr_player, infostate)
-        regrets = self._get_regret_table(curr_player, infostate)
-        for action, action_value in action_values.items():
-            regrets[action] += cf_reach_prob * (
-                action_value[curr_player] - state_value[curr_player]
-            )
-            avg_policy[action] += player_reach_prob * curr_policy[action]
-
     def _traverse_chance_node(self, state, reach_prob, updating_player, action_values):
         state_value = np.zeros(self.n_players)
         for outcome, outcome_prob in state.chance_outcomes():
@@ -175,11 +166,21 @@ class CFR:
             state_value += action_prob * np.asarray(action_values[action])
         return state_value
 
-    def average_policy(self, player: Optional[int] = None):
-        if player is None:
-            return self.avg_policy
-        else:
-            return [self.avg_policy[player]]
+    def _update_regret_and_avg_strategy(
+        self, action_values, state_value, reach_prob, infostate, curr_player
+    ):
+        player_reach_prob = reach_prob[curr_player]
+        cf_reach_prob = counterfactual_reach_prob(reach_prob, curr_player)
+        # fetch the infostate specific policy tables for the current player
+        avg_policy = self._get_average_strategy(curr_player, infostate)
+        curr_policy = self._get_current_strategy(curr_player, infostate)
+        regrets = self._get_regret_table(curr_player, infostate)
+        for action, action_value in action_values.items():
+            regrets[action] += cf_reach_prob * (
+                action_value[curr_player] - state_value[curr_player]
+            )
+            avg_policy[action] += player_reach_prob * curr_policy[action]
+
 
 
 def main(n_iter, simultaneous_updates: bool = True, do_print: bool = True):
