@@ -7,7 +7,7 @@ import numpy as np
 
 from rm import counterfactual_reach_prob, regret_matching
 import pyspiel
-
+from open_spiel.python.algorithms import exploitability
 from utils import (
     print_final_policy_profile,
     print_policy_profile,
@@ -75,7 +75,8 @@ class CFR:
                 regret_matching(player_policy[infostate], regret_dict)
 
     def iterate(
-        self, updating_player: Optional[int] = None,
+        self,
+        updating_player: Optional[int] = None,
     ):
         if self._verbose:
             print(
@@ -90,13 +91,15 @@ class CFR:
 
         root_reach_probabilities = {player.value: 1.0 for player in Players}
 
-        self._cfr(
-            self.root_state.clone(), root_reach_probabilities, updating_player,
+        self._traverse(
+            self.root_state.clone(),
+            root_reach_probabilities,
+            updating_player,
         )
         self._apply_regret_matching()
         self.iteration += 1
 
-    def _cfr(
+    def _traverse(
         self,
         state: pyspiel.State,
         reach_prob: dict[Action, Probability],
@@ -108,52 +111,69 @@ class CFR:
 
         curr_player = state.current_player()
         action_values = {}
-        state_value = np.zeros(self.n_players)
 
         if state.is_chance_node():
-            for outcome, outcome_prob in state.chance_outcomes():
-                next_state = state.child(outcome)
-
-                child_reach_prob = deepcopy(reach_prob)
-                child_reach_prob[state.current_player()] *= outcome_prob
-
-                action_values[outcome] = self._cfr(
-                    next_state, child_reach_prob, updating_player
-                )
-                state_value += outcome_prob * np.asarray(action_values[outcome])
-
-            return state_value
-
+            return self._traverse_chance_node(
+                state, reach_prob, updating_player, action_values
+            )
         else:
             infostate = self._get_information_state(curr_player, state)
-
-            for action, action_prob in self._get_current_strategy(
-                curr_player, infostate
-            ).items():
-                child_reach_prob = deepcopy(reach_prob)
-                child_reach_prob[curr_player] *= action_prob
-                next_state = state.child(action)
-
-                action_values[action] = self._cfr(
-                    next_state, child_reach_prob, updating_player
+            state_value = self._traverse_player_node(
+                state, infostate, reach_prob, updating_player, action_values
+            )
+            if self._simultaneous_updates or updating_player == curr_player:
+                self._update_regret_and_avg_strategy(
+                    action_values, state_value, reach_prob, infostate, curr_player
                 )
-                state_value += action_prob * np.asarray(action_values[action])
-
-            if updating_player == curr_player or self._simultaneous_updates:
-                player_reach_prob = reach_prob[curr_player]
-                cf_reach_prob = counterfactual_reach_prob(reach_prob, curr_player)
-                # fetch the infostate specific policy tables for the current player
-                avg_policy = self._get_average_strategy(curr_player, infostate)
-                curr_policy = self._get_current_strategy(curr_player, infostate)
-                regrets = self._get_regret_table(curr_player, infostate)
-
-                for action, action_value in action_values.items():
-                    regrets[action] += cf_reach_prob * (
-                        action_value[curr_player] - state_value[curr_player]
-                    )
-                    avg_policy[action] += player_reach_prob * curr_policy[action]
-
             return state_value
+
+    def _update_regret_and_avg_strategy(
+        self, action_values, state_value, reach_prob, infostate, curr_player
+    ):
+        player_reach_prob = reach_prob[curr_player]
+        cf_reach_prob = counterfactual_reach_prob(reach_prob, curr_player)
+        # fetch the infostate specific policy tables for the current player
+        avg_policy = self._get_average_strategy(curr_player, infostate)
+        curr_policy = self._get_current_strategy(curr_player, infostate)
+        regrets = self._get_regret_table(curr_player, infostate)
+        for action, action_value in action_values.items():
+            regrets[action] += cf_reach_prob * (
+                action_value[curr_player] - state_value[curr_player]
+            )
+            avg_policy[action] += player_reach_prob * curr_policy[action]
+
+    def _traverse_chance_node(self, state, reach_prob, updating_player, action_values):
+        state_value = np.zeros(self.n_players)
+        for outcome, outcome_prob in state.chance_outcomes():
+            next_state = state.child(outcome)
+
+            child_reach_prob = deepcopy(reach_prob)
+            child_reach_prob[state.current_player()] *= outcome_prob
+
+            action_values[outcome] = self._traverse(
+                next_state, child_reach_prob, updating_player
+            )
+            state_value += outcome_prob * np.asarray(action_values[outcome])
+        return state_value
+
+    def _traverse_player_node(
+        self, state, infostate, reach_prob, updating_player, action_values
+    ):
+        curr_player = state.current_player()
+        state_value = np.zeros(self.n_players)
+
+        for action, action_prob in self._get_current_strategy(
+            curr_player, infostate
+        ).items():
+            child_reach_prob = deepcopy(reach_prob)
+            child_reach_prob[curr_player] *= action_prob
+            next_state = state.child(action)
+
+            action_values[action] = self._traverse(
+                next_state, child_reach_prob, updating_player
+            )
+            state_value += action_prob * np.asarray(action_values[action])
+        return state_value
 
     def average_policy(self, player: Optional[int] = None):
         if player is None:
@@ -163,8 +183,6 @@ class CFR:
 
 
 def main(n_iter, simultaneous_updates: bool = True, do_print: bool = True):
-    from open_spiel.python.algorithms import exploitability
-
     if do_print:
         print(
             f"Running CFR with {'simultaneous updates' if simultaneous_updates else 'alternating updates'} for {n_iter} iterations."
@@ -189,7 +207,8 @@ def main(n_iter, simultaneous_updates: bool = True, do_print: bool = True):
         if simultaneous_updates or (not simultaneous_updates and i > 1):
             expl_values.append(
                 exploitability.exploitability(
-                    game, to_pyspiel_tab_policy(average_policies),
+                    game,
+                    to_pyspiel_tab_policy(average_policies),
                 )
             )
 
@@ -209,4 +228,4 @@ def main(n_iter, simultaneous_updates: bool = True, do_print: bool = True):
 
 
 if __name__ == "__main__":
-    main(n_iter=2000, do_print=False)
+    main(n_iter=2000, do_print=True)

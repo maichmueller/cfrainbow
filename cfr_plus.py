@@ -84,13 +84,13 @@ class CFRPlus:
 
         root_reach_probabilities = {player.value: 1.0 for player in Players}
 
-        self._cfr(
+        self._traverse(
             self.root_state.clone(), root_reach_probabilities, updating_player,
         )
         self._apply_regret_matching()
         self.iteration += 1
 
-    def _cfr(
+    def _traverse(
         self,
         state: pyspiel.State,
         reach_prob: dict[Action, Probability],
@@ -110,7 +110,7 @@ class CFRPlus:
                 child_reach_prob = deepcopy(reach_prob)
                 child_reach_prob[state.current_player()] *= outcome_prob
 
-                action_values[outcome] = self._cfr(
+                action_values[outcome] = self._traverse(
                     next_state, child_reach_prob, updating_player
                 )
                 state_value += outcome_prob * action_values[outcome]
@@ -131,7 +131,7 @@ class CFRPlus:
                 child_reach_prob[current_player] *= action_prob
                 next_state = state.child(action)
 
-                action_values[action] = self._cfr(
+                action_values[action] = self._traverse(
                     next_state, child_reach_prob, updating_player
                 )
                 state_value += action_prob * action_values[action]

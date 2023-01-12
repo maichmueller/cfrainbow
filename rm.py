@@ -27,7 +27,7 @@ def regret_matching(policy, regret_dict):
         for action, pos_regret in pos_regret_dict.items():
             policy[action] = pos_regret / pos_regret_sum
     else:
-        uniform_prob = 1 / len(pos_regret_dict)
+        uniform_prob = 1 / len(policy)
         for action in policy.keys():
             policy[action] = uniform_prob
 

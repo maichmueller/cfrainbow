@@ -93,14 +93,14 @@ class PureCFR:
         )
 
         self.plan.clear()
-        values = self._cfr(
+        values = self._traverse(
             self.root_state.clone(), updating_player, root_reach_probabilities
         )
         self._apply_regret_matching(updating_player)
         self.iteration += 1
         return values
 
-    def _cfr(
+    def _traverse(
         self,
         state: pyspiel.State,
         updating_player: Optional[int] = None,
@@ -119,7 +119,7 @@ class PureCFR:
                 policy=[outcome[1] for outcome in outcomes_probs],
                 rng=self.rng,
             )
-            return self._cfr(state.child(int(outcome)), updating_player, reach_prob)
+            return self._traverse(state.child(int(outcome)), updating_player, reach_prob)
 
         infostate = self._get_information_state(current_player, state)
         actions = state.legal_actions()
@@ -136,7 +136,7 @@ class PureCFR:
                     child_reach_prob = deepcopy(reach_prob)
                     child_reach_prob[current_player] *= player_policy[action]
 
-                action_values[action] = self._cfr(
+                action_values[action] = self._traverse(
                     state.child(action), updating_player, child_reach_prob
                 )
 
@@ -170,7 +170,7 @@ class PureCFR:
                 sampled_action
             ] += 1
             state.apply_action(sampled_action)
-            state_value = self._cfr(state, updating_player)
+            state_value = self._traverse(state, updating_player)
 
         return state_value
 
