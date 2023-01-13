@@ -7,20 +7,11 @@ import numpy as np
 
 import pyspiel
 
-from rm import regret_matching, counterfactual_reach_prob, regret_matching_plus
+from rm import regret_matching, regret_matching_plus
 from utils import (
-    print_final_policy_profile,
-    print_policy_profile,
-    to_pyspiel_tab_policy,
+    counterfactual_reach_prob
 )
-
-
-Action = int
-Probability = float
-Regret = float
-Value = float
-Infostate = str
-
+from type_aliases import Action, Infostate, Probability, Regret, Value
 
 class Players(Enum):
     chance = -1
@@ -57,10 +48,10 @@ class DiscountedCFR:
         self._do_rm_plus = do_regret_matching_plus
         self._verbose = verbose
 
-    def _get_current_strategy(self, current_player, infostate):
+    def _get_current_policy(self, current_player, infostate):
         return self.curr_policy[current_player][infostate]
 
-    def _get_average_strategy(self, current_player, infostate):
+    def _get_average_policy(self, current_player, infostate):
         if infostate not in self.avg_policy[current_player]:
             self.avg_policy[current_player][infostate] = defaultdict(float)
         return self.avg_policy[current_player][infostate]
@@ -80,9 +71,9 @@ class DiscountedCFR:
 
     def _apply_weights(self, updating_player: Optional[int] = None):
         t = self.iteration + 1  # avoid iteration 0 weight
-        alpha_weight = t ** self.alpha
+        alpha_weight = t**self.alpha
         alpha_weight /= alpha_weight + 1
-        beta_weight = t ** self.beta
+        beta_weight = t**self.beta
         beta_weight /= beta_weight + 1
         regret_weights = (beta_weight, alpha_weight)
         gamma_weight = (t / (t + 1)) ** self.gamma
@@ -117,7 +108,8 @@ class DiscountedCFR:
                     regret_matching(player_policy[infostate], regret_dict)
 
     def iterate(
-        self, updating_player: Optional[int] = None,
+        self,
+        updating_player: Optional[int] = None,
     ):
         if self._verbose:
             print(
@@ -133,7 +125,9 @@ class DiscountedCFR:
         root_reach_probabilities = {player.value: 1.0 for player in Players}
 
         self._traverse(
-            self.root_state.clone(), root_reach_probabilities, updating_player,
+            self.root_state.clone(),
+            root_reach_probabilities,
+            updating_player,
         )
         self._apply_weights(updating_player)
         self._apply_regret_matching()
@@ -170,7 +164,7 @@ class DiscountedCFR:
         else:
             infostate = self._get_information_state(curr_player, state)
 
-            for action, action_prob in self._get_current_strategy(
+            for action, action_prob in self._get_current_policy(
                 curr_player, infostate
             ).items():
                 child_reach_prob = deepcopy(reach_prob)
@@ -186,8 +180,8 @@ class DiscountedCFR:
                 player_reach_prob = reach_prob[curr_player]
                 cf_reach_prob = counterfactual_reach_prob(reach_prob, curr_player)
                 # fetch the infostate specific policy tables for the current player
-                avg_policy = self._get_average_strategy(curr_player, infostate)
-                curr_policy = self._get_current_strategy(curr_player, infostate)
+                avg_policy = self._get_average_policy(curr_player, infostate)
+                curr_policy = self._get_current_policy(curr_player, infostate)
                 regrets = self._get_regret_table(curr_player, infostate)
 
                 for action, action_value in action_values.items():
@@ -227,61 +221,3 @@ class LinearCFR:
             beta=1.0,
             gamma=1.0,
         )
-
-
-def main(
-    n_iter,
-    simultaneous_updates: bool = True,
-    rm_plus: bool = False,
-    do_print: bool = True,
-):
-    from open_spiel.python.algorithms import exploitability
-
-    if do_print:
-        print(
-            f"Running Discounted CFR with"
-            f" {'simultaneous updates' if simultaneous_updates else 'alternating updates'}"
-            f" for {n_iter} iterations."
-        )
-
-    expl_values = []
-    game = pyspiel.load_game("kuhn_poker")
-    root_state = game.new_initial_state()
-    n_players = list(range(root_state.num_players()))
-    current_policies = [{} for _ in n_players]
-    average_policies = [{} for _ in n_players]
-    solver = DiscountedCFR(
-        root_state,
-        current_policies,
-        average_policies,
-        simultaneous_updates=simultaneous_updates,
-        do_regret_matching_plus=rm_plus,
-        verbose=do_print,
-    )
-    for i in range(n_iter):
-        solver.iterate()
-
-        if simultaneous_updates or (not simultaneous_updates and i > 1):
-            expl_values.append(
-                exploitability.exploitability(
-                    game, to_pyspiel_tab_policy(average_policies),
-                )
-            )
-
-            if do_print:
-                print(
-                    f"-------------------------------------------------------------"
-                    f"--> Exploitability {expl_values[-1]: .5f}"
-                )
-                print_policy_profile(deepcopy(average_policies))
-                print(
-                    f"---------------------------------------------------------------"
-                )
-    if do_print:
-        print_final_policy_profile(average_policies)
-
-    return expl_values
-
-
-if __name__ == "__main__":
-    main(n_iter=2000, simultaneous_updates=True, do_print=False)

@@ -1,34 +1,51 @@
 from collections import defaultdict
 from copy import deepcopy
+from enum import Enum
 from typing import Dict, Mapping, Optional
 
 import numpy as np
 
-from rm import regret_matching
+from rm import counterfactual_reach_prob, regret_matching
 import pyspiel
-from utils import counterfactual_reach_prob
+from open_spiel.python.algorithms import exploitability
+from utils import (
+    print_final_policy_profile,
+    print_kuhn_poker_policy_profile,
+    to_pyspiel_tab_policy,
+)
 
-from type_aliases import Action, Infostate, Probability, Regret, Value
+
+Action = int
+Probability = float
+Regret = float
+Value = float
+Infostate = str
 
 
-class CFR:
+class Players(Enum):
+    chance = -1
+    player1 = 0
+    player2 = 1
+
+
+class PredictivePlusCFR:
     def __init__(
         self,
         root_state: pyspiel.State,
         curr_policy_list: list[Dict[Infostate, Mapping[Action, Probability]]],
         average_policy_list: list[Dict[Infostate, Mapping[Action, Probability]]],
-        *,
         simultaneous_updates: bool = True,
         verbose: bool = False,
     ):
         self.root_state = root_state
         self.n_players = list(range(root_state.num_players()))
         self.regret_table: list[Dict[Infostate, Dict[Action, Regret]]] = [
-            {} for _ in self.n_players
+            {} for p in self.n_players
         ]
         self.curr_policy = curr_policy_list
         self.avg_policy = average_policy_list
         self.iteration = 0
+
         self._simultaneous_updates = simultaneous_updates
         self._verbose = verbose
 
@@ -59,9 +76,6 @@ class CFR:
 
         return self.regret_table[current_player][infostate]
 
-    def _action_value_dict(cls):
-        return dict()
-
     def _apply_regret_matching(self):
         for player, player_policy in enumerate(self.curr_policy):
             for infostate, regret_dict in self.regret_table[player].items():
@@ -82,7 +96,7 @@ class CFR:
         if updating_player is None and not self._simultaneous_updates:
             updating_player = self.iteration % 2
 
-        root_reach_probabilities = {player: 1.0 for player in [-1] + self.n_players}
+        root_reach_probabilities = {player.value: 1.0 for player in Players}
 
         self._traverse(
             self.root_state.clone(),
@@ -99,16 +113,17 @@ class CFR:
         updating_player: Optional[int] = None,
     ):
         if state.is_terminal():
-            return state.returns()
+            reward = state.returns()
+            return reward
 
-        action_values = self._action_value_dict()
+        curr_player = state.current_player()
+        action_values = {}
 
         if state.is_chance_node():
             return self._traverse_chance_node(
                 state, reach_prob, updating_player, action_values
             )
         else:
-            curr_player = state.current_player()
             infostate = self._get_information_state(curr_player, state)
             state_value = self._traverse_player_node(
                 state, infostate, reach_prob, updating_player, action_values
@@ -137,7 +152,7 @@ class CFR:
         self, state, infostate, reach_prob, updating_player, action_values
     ):
         curr_player = state.current_player()
-        state_value = np.zeros(len(self.n_players))
+        state_value = np.zeros(self.n_players)
 
         for action, action_prob in self._get_current_policy(
             curr_player, infostate
@@ -166,3 +181,53 @@ class CFR:
                 action_value[curr_player] - state_value[curr_player]
             )
             avg_policy[action] += player_reach_prob * curr_policy[action]
+
+
+
+def main(n_iter, simultaneous_updates: bool = True, do_print: bool = True):
+    if do_print:
+        print(
+            f"Running CFR with {'simultaneous updates' if simultaneous_updates else 'alternating updates'} for {n_iter} iterations."
+        )
+
+    expl_values = []
+    game = pyspiel.load_game("kuhn_poker")
+    root_state = game.new_initial_state()
+    n_players = list(range(root_state.num_players()))
+    current_policies = [{} for _ in n_players]
+    average_policies = [{} for _ in n_players]
+    solver = CFR(
+        root_state,
+        current_policies,
+        average_policies,
+        simultaneous_updates=simultaneous_updates,
+        verbose=do_print,
+    )
+    for i in range(n_iter):
+        solver.iterate()
+
+        if simultaneous_updates or (not simultaneous_updates and i > 1):
+            expl_values.append(
+                exploitability.exploitability(
+                    game,
+                    to_pyspiel_tab_policy(average_policies),
+                )
+            )
+
+            if do_print:
+                print(
+                    f"-------------------------------------------------------------"
+                    f"--> Exploitability {expl_values[-1]: .5f}"
+                )
+                print_kuhn_poker_policy_profile(deepcopy(average_policies))
+                print(
+                    f"---------------------------------------------------------------"
+                )
+    if do_print:
+        print_final_policy_profile(average_policies)
+
+    return expl_values
+
+
+if __name__ == "__main__":
+    main(n_iter=2000, do_print=True)

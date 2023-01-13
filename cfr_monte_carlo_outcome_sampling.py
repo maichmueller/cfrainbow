@@ -8,10 +8,11 @@ import pyspiel
 from open_spiel.python.algorithms import exploitability
 
 import rm
-from rm import regret_matching, counterfactual_reach_prob
+from rm import regret_matching
 from utils import (
+    counterfactual_reach_prob,
     to_pyspiel_tab_policy,
-    print_policy_profile,
+    print_kuhn_poker_policy_profile,
     print_final_policy_profile,
 )
 
@@ -54,10 +55,10 @@ class OutcomeSamplingMCCFR:
     def average_policy(self):
         return self.avg_policy
 
-    def _get_current_strategy(self, current_player, infostate):
+    def _get_current_policy(self, current_player, infostate):
         return self.curr_policy[current_player][infostate]
 
-    def _get_average_strategy(self, current_player, infostate):
+    def _get_average_policy(self, current_player, infostate):
         if infostate not in (player_policy := self.avg_policy[current_player]):
             player_policy[infostate] = defaultdict(float)
         return player_policy[infostate]
@@ -94,7 +95,7 @@ class OutcomeSamplingMCCFR:
         if updating_player is None and not self._simultaneous_updates:
             updating_player = self.iteration % 2
 
-        value, tail_prob = self._mccfr(
+        value, tail_prob = self._traverse(
             deepcopy(self.root_state),
             {player: 1.0 for player in [-1] + self.n_players},
             updating_player,
@@ -106,7 +107,7 @@ class OutcomeSamplingMCCFR:
         self.iteration += 1
         return value
 
-    def _mccfr(
+    def _traverse(
         self,
         state: pyspiel.State,
         reach_prob: dict[int, float],
@@ -132,7 +133,7 @@ class OutcomeSamplingMCCFR:
             reach_prob[curr_player] *= chance_policy[sampled_action]
             state.apply_action(int(sampled_action))
 
-            return self._mccfr(
+            return self._traverse(
                 state,
                 reach_prob,
                 updating_player,
@@ -141,7 +142,7 @@ class OutcomeSamplingMCCFR:
             )
 
         infostate = self._get_information_state(curr_player, state)
-        player_policy = self._get_current_strategy(curr_player, infostate)
+        player_policy = self._get_current_policy(curr_player, infostate)
         regret_table = self._get_regret_table(curr_player, infostate)
 
         regret_matching(player_policy, regret_table)
@@ -162,7 +163,7 @@ class OutcomeSamplingMCCFR:
             )
 
         state.apply_action(sampled_action)
-        action_value, tail_prob = self._mccfr(
+        action_value, tail_prob = self._traverse(
             state,
             child_reach_prob,
             updating_player,
@@ -184,7 +185,7 @@ class OutcomeSamplingMCCFR:
                     )
                 )
             if self._simultaneous_updates:
-                self._update_average_strategy(
+                self._update_average_policy(
                     curr_player,
                     infostate,
                     player_policy,
@@ -194,7 +195,7 @@ class OutcomeSamplingMCCFR:
                     weights,
                 )
         else:
-            self._update_average_strategy(
+            self._update_average_policy(
                 curr_player,
                 infostate,
                 player_policy,
@@ -205,7 +206,7 @@ class OutcomeSamplingMCCFR:
             )
         return action_value, tail_prob * sampled_action_prob
 
-    def _update_average_strategy(
+    def _update_average_policy(
         self,
         curr_player,
         infostate,
@@ -215,7 +216,7 @@ class OutcomeSamplingMCCFR:
         sample_probability,
         weights,
     ):
-        avg_policy = self._get_average_strategy(curr_player, infostate)
+        avg_policy = self._get_average_policy(curr_player, infostate)
         if self.weighting_mode == MCCFRWeightingMode.optimistic:
             last_visit_difference = self.iteration + 1 - self.last_visit[infostate]
             self.last_visit[infostate] = self.iteration
@@ -255,72 +256,3 @@ class OutcomeSamplingMCCFR:
 
         sampled_action = self.rng.choice(choices, p=list(sample_policy.values()))
         return sampled_action, policy[sampled_action], sample_policy[sampled_action]
-
-
-def main(
-    n_iter,
-    simultaneous_updates: bool = True,
-    weighting_mode: Union[int, MCCFRWeightingMode] = 2,
-    do_print: bool = True,
-):
-
-    expl_values = []
-    game = pyspiel.load_game("kuhn_poker")
-    root_state = game.new_initial_state()
-    n_players = list(range(root_state.num_players()))
-    current_policies = [{} for _ in n_players]
-    average_policies = [{} for _ in n_players]
-    all_infostates = {
-        state.information_state_string(state.current_player())
-        for state in rm.all_states_gen(game=game)
-    }
-
-    solver = OutcomeSamplingMCCFR(
-        root_state,
-        current_policies,
-        average_policies,
-        weighting_mode=MCCFRWeightingMode(weighting_mode),
-        simultaneous_updates=simultaneous_updates,
-        verbose=do_print,
-        seed=0
-    )
-
-    if do_print:
-        print(
-            f"Running Outcome Sampling MCCFR with "
-            f"{'simultaneous updates' if simultaneous_updates else 'alternating updates'} and "
-            f"{MCCFRWeightingMode(weighting_mode).name} weighting"
-            f"for {n_iter} iterations."
-        )
-
-    for i in range(n_iter):
-        solver.iterate()
-
-        if sum(map(lambda p: len(p), solver.average_policy())) == len(
-            all_infostates
-        ) and (simultaneous_updates or (not simultaneous_updates and i > 1)):
-            average_policy = solver.average_policy()
-            expl_values.append(
-                exploitability.exploitability(
-                    game,
-                    to_pyspiel_tab_policy(average_policy),
-                )
-            )
-
-            if do_print:
-                print(
-                    f"-------------------------------------------------------------"
-                    f"--> Exploitability {expl_values[-1]: .5f}"
-                )
-                print_policy_profile(deepcopy(average_policy))
-                print(
-                    f"---------------------------------------------------------------"
-                )
-    if do_print:
-        print_final_policy_profile(solver.average_policy())
-
-    return expl_values
-
-
-if __name__ == "__main__":
-    main(n_iter=200000, simultaneous_updates=False, weighting_mode=0, do_print=True)

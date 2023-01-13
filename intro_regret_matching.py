@@ -38,7 +38,7 @@ def regret_matching(cumulative_regret: Mapping[Action, Regret]):
         action: max(0, regret) for action, regret in cumulative_regret.items()
     }
     if any([regret > 0 for regret in pos_regrets.values()]):
-        new_strategy = {
+        new_policy = {
             action: regret / sum(pos_regrets.values())
             for action, regret in pos_regrets.items()
         }
@@ -46,9 +46,9 @@ def regret_matching(cumulative_regret: Mapping[Action, Regret]):
         uniform_distribution = {
             action: 1.0 / len(cumulative_regret) for action in cumulative_regret.keys()
         }
-        new_strategy = uniform_distribution
+        new_policy = uniform_distribution
 
-    return pd.Series(new_strategy, index=action_set)
+    return pd.Series(new_policy, index=action_set)
 
 
 def u(

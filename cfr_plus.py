@@ -6,28 +6,19 @@ from enum import Enum
 from functools import reduce
 from typing import Dict, Mapping, Optional
 
-from rm import kuhn_optimal_policy, regret_matching_plus, counterfactual_reach_prob
+from cfr import CFR
+from rm import regret_matching_plus
 import pyspiel
 import matplotlib.pyplot as plt
 
 from utils import (
+    counterfactual_reach_prob,
+    kuhn_optimal_policy,
     print_final_policy_profile,
-    print_policy_profile,
+    print_kuhn_poker_policy_profile,
     to_pyspiel_tab_policy,
 )
-
-
-Action = int
-Probability = float
-Regret = float
-Value = float
-Infostate = str
-
-
-class Players(Enum):
-    chance = -1
-    player1 = 0
-    player2 = 1
+from type_aliases import Action, Infostate, Probability, Regret, Value
 
 
 class CFRPlus:
@@ -39,18 +30,19 @@ class CFRPlus:
         verbose: bool = False,
     ):
         self.root_state = root_state
+        self.n_players = list(range(root_state.num_players()))
         self.regret_table: list[Dict[Infostate, Dict[Action, Regret]]] = [
-            {} for p in range(root_state.num_players())
+            {} for _ in self.n_players
         ]
         self.curr_policy = curr_policy_list
         self.avg_policy = average_policy_list
         self.iteration = 0
         self._verbose = verbose
 
-    def _get_current_strategy(self, current_player, infostate):
+    def _get_current_policy(self, current_player, infostate):
         return self.curr_policy[current_player][infostate]
 
-    def _get_average_strategy(self, current_player, infostate):
+    def _get_average_policy(self, current_player, infostate):
         if infostate not in self.avg_policy[current_player]:
             self.avg_policy[current_player][infostate] = defaultdict(float)
         return self.avg_policy[current_player][infostate]
@@ -74,7 +66,8 @@ class CFRPlus:
                 regret_matching_plus(player_policy[infostate], regret_dict)
 
     def iterate(
-        self, updating_player: Optional[int] = None,
+        self,
+        updating_player: Optional[int] = None,
     ):
         if self._verbose:
             print("\nIteration", self.iteration // 2, f"{(self.iteration % 2 + 1)}/{2}")
@@ -82,10 +75,12 @@ class CFRPlus:
         if updating_player is None:
             updating_player = self.iteration % 2
 
-        root_reach_probabilities = {player.value: 1.0 for player in Players}
+        root_reach_probabilities = {player: 1.0 for player in [-1] + self.n_players}
 
         self._traverse(
-            self.root_state.clone(), root_reach_probabilities, updating_player,
+            self.root_state.clone(),
+            root_reach_probabilities,
+            updating_player,
         )
         self._apply_regret_matching()
         self.iteration += 1
@@ -124,7 +119,7 @@ class CFRPlus:
 
             infostate = self._get_information_state(current_player, state)
 
-            for action, action_prob in self._get_current_strategy(
+            for action, action_prob in self._get_current_policy(
                 current_player, infostate
             ).items():
                 child_reach_prob = deepcopy(reach_prob)
@@ -140,8 +135,8 @@ class CFRPlus:
                 player_reach_prob = reach_prob[current_player]
                 cf_reach_prob = counterfactual_reach_prob(reach_prob, current_player)
                 # fetch the infostate specific policy tables for the current player
-                avg_policy = self._get_average_strategy(current_player, infostate)
-                curr_policy = self._get_current_strategy(current_player, infostate)
+                avg_policy = self._get_average_policy(current_player, infostate)
+                curr_policy = self._get_current_policy(current_player, infostate)
                 regrets = self._get_regret_table(current_player, infostate)
 
                 for action, action_value in action_values.items():
@@ -178,7 +173,8 @@ def main(n_iter, do_print: bool = True):
 
         expl_values.append(
             exploitability.exploitability(
-                game, to_pyspiel_tab_policy(average_policies),
+                game,
+                to_pyspiel_tab_policy(average_policies),
             )
         )
 
@@ -187,7 +183,7 @@ def main(n_iter, do_print: bool = True):
                 f"-------------------------------------------------------------"
                 f"--> Exploitability {expl_values[-1]: .5f}"
             )
-            print_policy_profile(deepcopy(average_policies))
+            print_kuhn_poker_policy_profile(deepcopy(average_policies))
             print(f"---------------------------------------------------------------")
     if do_print:
         print_final_policy_profile(average_policies)

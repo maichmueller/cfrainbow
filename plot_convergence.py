@@ -23,7 +23,7 @@ from rm import all_states_gen
 from utils import (
     to_pyspiel_tab_policy,
     print_final_policy_profile,
-    print_policy_profile,
+    print_kuhn_poker_policy_profile,
 )
 
 from cfr import CFR
@@ -291,7 +291,7 @@ def run_solver(
                     f"--> Exploitability {expl_values[-1]: .5f}"
                 )
                 if game_name == "kuhn_poker":
-                    print_policy_profile(deepcopy(avg_policy))
+                    print_kuhn_poker_policy_profile(deepcopy(avg_policy))
                     print(
                         f"---------------------------------------------------------------"
                     )

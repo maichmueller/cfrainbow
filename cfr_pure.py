@@ -2,37 +2,20 @@ from collections import defaultdict
 from copy import deepcopy
 from typing import Optional, Dict, Sequence, Union
 
-from open_spiel.python.algorithms import exploitability
-
-from rm import (
-    regret_matching,
-    all_states_gen,
-    counterfactual_reach_prob,
-)
+from rm import regret_matching
 import pyspiel
 import numpy as np
 
-from utils import (
-    to_pyspiel_tab_policy,
-    sample_on_policy,
-    print_final_policy_profile,
-    print_policy_profile,
-)
-
-
-Action = int
-Probability = float
-Regret = float
-Value = float
-Infostate = str
+from utils import sample_on_policy, counterfactual_reach_prob
+from type_aliases import Action, Infostate, Probability, Regret, Value
 
 
 class PureCFR:
     def __init__(
         self,
         root_state: pyspiel.State,
-        curr_policy_list: list[Dict[str, Dict[int, float]]],
-        average_policy_list: list[Dict[str, Dict[int, float]]],
+        curr_policy_list: list[Dict[Infostate, Dict[Action, Probability]]],
+        average_policy_list: list[Dict[Infostate, Dict[Action, float]]],
         *,
         seed: Optional[Union[int, np.random.Generator]] = None,
         simultaneous_updates: bool = True,
@@ -40,7 +23,7 @@ class PureCFR:
     ):
         self.root_state = root_state
         self.n_players = list(range(root_state.num_players()))
-        self.regret_table: list[Dict[str, Dict[int, float]]] = [
+        self.regret_table: list[Dict[Infostate, Dict[Action, float]]] = [
             {} for p in self.n_players
         ]
         self.curr_policy = curr_policy_list
@@ -52,7 +35,7 @@ class PureCFR:
         self._simultaneous_updates = simultaneous_updates
         self._verbose = verbose
 
-    def _get_average_strategy(
+    def _get_average_policy(
         self, current_player, infostate, actions: Optional[Sequence[int]] = None
     ):
         if infostate not in (player_policy := self.avg_policy[current_player]):
@@ -73,7 +56,8 @@ class PureCFR:
         return self.regret_table[current_player][infostate]
 
     def iterate(
-        self, updating_player: Optional[int] = None,
+        self,
+        updating_player: Optional[int] = None,
     ):
         if self._verbose:
             print(
@@ -119,11 +103,13 @@ class PureCFR:
                 policy=[outcome[1] for outcome in outcomes_probs],
                 rng=self.rng,
             )
-            return self._traverse(state.child(int(outcome)), updating_player, reach_prob)
+            return self._traverse(
+                state.child(int(outcome)), updating_player, reach_prob
+            )
 
         infostate = self._get_information_state(current_player, state)
         actions = state.legal_actions()
-        player_policy = self._get_current_strategy(current_player, infostate, actions)
+        player_policy = self._get_current_policy(current_player, infostate, actions)
 
         sampled_action = self._get_sampled_action(infostate, player_policy)
 
@@ -149,7 +135,7 @@ class PureCFR:
             #  from chance-sampling and pure cfr: The state value is computed according to pure-car's sampled
             #  action-value, but the difference of each action value to the state value is then multiplied by the
             #  cf. reach probability as in chance-sampling. Why this ends up being a correct regret update is unclear,
-            #  even more so because the strategy update is exactly according to pure cfr, and not chance-sampling.
+            #  even more so because the policy update is exactly according to pure cfr, and not chance-sampling.
             prob_weight = (
                 counterfactual_reach_prob(reach_prob, current_player)
                 if self._simultaneous_updates
@@ -161,12 +147,12 @@ class PureCFR:
                 )
 
             if self._simultaneous_updates:
-                self._get_average_strategy(current_player, infostate, actions)[
+                self._get_average_policy(current_player, infostate, actions)[
                     sampled_action
                 ] += 1
 
         else:
-            self._get_average_strategy(current_player, infostate, actions)[
+            self._get_average_policy(current_player, infostate, actions)[
                 sampled_action
             ] += 1
             state.apply_action(sampled_action)
@@ -174,7 +160,7 @@ class PureCFR:
 
         return state_value
 
-    def _get_current_strategy(self, current_player, infostate, actions):
+    def _get_current_policy(self, current_player, infostate, actions):
         if infostate not in (player_policy := self.curr_policy[current_player]):
             player_policy[infostate] = {
                 action: 1.0 / len(actions) for action in actions
@@ -185,7 +171,8 @@ class PureCFR:
         if infostate not in self.plan:
             actions = list(player_policy.keys())
             self.plan[infostate] = self.rng.choice(
-                actions, p=[player_policy[action] for action in actions],
+                actions,
+                p=[player_policy[action] for action in actions],
             )
         sampled_action = self.plan[infostate]
         return sampled_action
@@ -201,62 +188,3 @@ class PureCFR:
             return self.avg_policy
         else:
             return [self.avg_policy[player]]
-
-
-def main(n_iter, simultaneous_updates: bool = True, do_print: bool = True):
-
-    if do_print:
-        print(
-            f"Running Pure CFR with "
-            f"{'simultaneous updates' if simultaneous_updates else 'alternating updates'} "
-            f"for {n_iter} iterations."
-        )
-
-    expl_values = []
-    game = pyspiel.load_game("kuhn_poker")
-    root_state = game.new_initial_state()
-    n_players = list(range(root_state.num_players()))
-    current_policies = [{} for _ in n_players]
-    average_policies = [{} for _ in n_players]
-    all_infostates = {
-        state.information_state_string(state.current_player())
-        for state in all_states_gen(game=game)
-    }
-    solver = PureCFR(
-        root_state,
-        current_policies,
-        average_policies,
-        simultaneous_updates=simultaneous_updates,
-        verbose=do_print,
-    )
-    for i in range(n_iter):
-        solver.iterate()
-
-        if sum(map(lambda p: len(p), solver.average_policy())) == len(
-            all_infostates
-        ) and (simultaneous_updates or (not simultaneous_updates and i > 1)):
-            average_policy = solver.average_policy()
-            expl_values.append(
-                exploitability.exploitability(
-                    game, to_pyspiel_tab_policy(average_policy),
-                )
-            )
-
-            if do_print:
-                print(
-                    f"-------------------------------------------------------------"
-                    f"--> Exploitability {expl_values[-1]: .5f}"
-                )
-                print_policy_profile(deepcopy(average_policy))
-                print(
-                    f"---------------------------------------------------------------"
-                )
-    if do_print:
-        print_final_policy_profile(solver.average_policy())
-
-    return expl_values
-
-
-if __name__ == "__main__":
-    main(n_iter=20000, simultaneous_updates=True, do_print=True)
-    # main(n_iter=20000, simultaneous_updates=False, do_print=True)

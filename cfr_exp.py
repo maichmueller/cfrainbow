@@ -5,27 +5,11 @@ from typing import Dict, Mapping, Optional
 
 import numpy as np
 
-from rm import counterfactual_reach_prob, regret_matching
+from rm import regret_matching
 import pyspiel
 
-from utils import (
-    print_final_policy_profile,
-    print_policy_profile,
-    to_pyspiel_tab_policy,
-)
-
-
-Action = int
-Probability = float
-Regret = float
-Value = float
-Infostate = str
-
-
-class Player(Enum):
-    chance = -1
-    player1 = 0
-    player2 = 1
+from utils import counterfactual_reach_prob
+from type_aliases import Action, Infostate, Probability, Regret, Value
 
 
 class ExponentialCFR:
@@ -56,7 +40,7 @@ class ExponentialCFR:
         self._simultaneous_updates = simultaneous_updates
         self._verbose = verbose
 
-    def _get_current_strategy(self, player: int, infostate: Infostate):
+    def _get_current_policy(self, player: int, infostate: Infostate):
         return self.curr_policy[player][infostate]
 
     def _get_avg_policy(
@@ -105,7 +89,8 @@ class ExponentialCFR:
         return policy_out
 
     def iterate(
-        self, updating_player: Optional[int] = None,
+        self,
+        updating_player: Optional[int] = None,
     ):
         if self._verbose:
             print(
@@ -121,7 +106,9 @@ class ExponentialCFR:
         root_reach_probabilities = {player.value: 1.0 for player in Player}
 
         self._traverse(
-            self.root_state.clone(), root_reach_probabilities, updating_player,
+            self.root_state.clone(),
+            root_reach_probabilities,
+            updating_player,
         )
         self._apply_exponential_weight(updating_player)
         self._apply_regret_matching()
@@ -158,7 +145,7 @@ class ExponentialCFR:
         else:
             infostate = self._get_information_state(curr_player, state)
 
-            for action, action_prob in self._get_current_strategy(
+            for action, action_prob in self._get_current_policy(
                 curr_player, infostate
             ).items():
                 child_reach_prob = deepcopy(reach_prob)
@@ -196,10 +183,10 @@ class ExponentialCFR:
                 cumulative_regret_table = self._get_regret_table(
                     player, infostate, temp=False
                 )
-                strategy_numerator = self._get_avg_policy(
+                policy_numerator = self._get_avg_policy(
                     player, infostate, numerator=True
                 )
-                strategy_denominator = self._get_avg_policy(
+                policy_denominator = self._get_avg_policy(
                     player, infostate, numerator=False
                 )
                 reach_prob = self._reach_prob[infostate]
@@ -209,59 +196,10 @@ class ExponentialCFR:
                     policy_weight = exp_l1 * reach_prob
 
                     cumulative_regret_table[action] += exp_l1 * regret
-                    strategy_numerator[action] += (
+                    policy_numerator[action] += (
                         policy_weight
-                        * self._get_current_strategy(player, infostate)[action]
+                        * self._get_current_policy(player, infostate)[action]
                     )
-                    strategy_denominator[action] += policy_weight
+                    policy_denominator[action] += policy_weight
                 # delete the content of the temporary regret incr table
                 regret_incrs.clear()
-
-
-def main(n_iter, simultaneous_updates: bool = True, do_print: bool = True):
-    from open_spiel.python.algorithms import exploitability
-
-    if do_print:
-        print(
-            f"Running CFR with {'simultaneous updates' if simultaneous_updates else 'alternating updates'} for {n_iter} iterations."
-        )
-
-    expl_values = []
-    game = pyspiel.load_game("kuhn_poker")
-    root_state = game.new_initial_state()
-    n_players = list(range(root_state.num_players()))
-    current_policies = [{} for _ in n_players]
-    average_policies = [{} for _ in n_players]
-    solver = ExponentialCFR(
-        root_state,
-        current_policies,
-        average_policies,
-        simultaneous_updates=simultaneous_updates,
-        verbose=do_print,
-    )
-    for i in range(n_iter):
-        solver.iterate()
-
-        if simultaneous_updates or (not simultaneous_updates and i > 1):
-            avg_policy = solver.average_policy()
-            expl_values.append(
-                exploitability.exploitability(game, to_pyspiel_tab_policy(avg_policy),)
-            )
-
-            if do_print:
-                print(
-                    f"-------------------------------------------------------------"
-                    f"--> Exploitability {expl_values[-1]: .5f}"
-                )
-                print_policy_profile(avg_policy)
-                print(
-                    f"---------------------------------------------------------------"
-                )
-    if do_print:
-        print_final_policy_profile(solver.average_policy())
-
-    return expl_values
-
-
-if __name__ == "__main__":
-    main(n_iter=2000, do_print=True)

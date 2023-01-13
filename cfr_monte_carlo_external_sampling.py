@@ -8,10 +8,10 @@ import pyspiel
 from open_spiel.python.algorithms import exploitability
 
 import rm
-from rm import regret_matching, counterfactual_reach_prob
+from rm import regret_matching
 from utils import (
     to_pyspiel_tab_policy,
-    print_policy_profile,
+    print_kuhn_poker_policy_profile,
     print_final_policy_profile,
 )
 
@@ -126,62 +126,3 @@ class ExternalSamplingMCCFR:
             self.avg_policy[current_player][infostate] = {
                 action: 0.0 for action in state.legal_actions()
             }
-
-
-def main(n_iter, do_print: bool = True):
-
-    expl_values = []
-    game = pyspiel.load_game("kuhn_poker")
-    root_state = game.new_initial_state()
-    n_players = list(range(root_state.num_players()))
-    current_policies = [{} for _ in n_players]
-    average_policies = [{} for _ in n_players]
-    all_infostates = {
-        state.information_state_string(state.current_player())
-        for state in rm.all_states_gen(game=game)
-    }
-
-    if do_print:
-        print(
-            f"Running External Sampling MCCFR "
-            f"for {n_iter} iterations."
-        )
-
-    solver = ExternalSamplingMCCFR(
-        root_state,
-        current_policies,
-        average_policies,
-        verbose=do_print,
-        seed=0,
-    )
-    for i in range(n_iter):
-        solver.iterate()
-
-        if sum(map(lambda p: len(p), solver.average_policy())) == len(
-            all_infostates
-        ):
-            average_policy = solver.average_policy()
-            expl_values.append(
-                exploitability.exploitability(
-                    game,
-                    to_pyspiel_tab_policy(average_policy),
-                )
-            )
-
-            if do_print:
-                print(
-                    f"-------------------------------------------------------------"
-                    f"--> Exploitability {expl_values[-1]: .5f}"
-                )
-                print_policy_profile(deepcopy(average_policy))
-                print(
-                    f"---------------------------------------------------------------"
-                )
-    if do_print:
-        print_final_policy_profile(solver.average_policy())
-
-    return expl_values
-
-
-if __name__ == "__main__":
-    main(n_iter=20000, do_print=True)
