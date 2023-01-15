@@ -8,6 +8,7 @@ from cfr2 import CFR2
 from cfr_discounted2 import DiscountedCFR2
 from cfr_linear2 import LinearCFR2
 from cfr_plus2 import CFRPlus2
+from cfr_monte_carlo_chance_sampling2 import ChanceSamplingCFR2
 from cfr import CFR
 from cfr_discounted import DiscountedCFR
 from cfr_plus import CFRPlus
@@ -90,7 +91,7 @@ def main(
 def main2(
     n_iter,
     cfr_class,
-    regret_minimizer: type[rm.RegretMinimizer] = rm.RegretMatcher,
+    regret_minimizer: type[rm.ExternalRegretMinimizer] = rm.RegretMatcher,
     game_name: str = "kuhn_poker",
     do_print: bool = True,
     tqdm_print: bool = False,
@@ -119,14 +120,19 @@ def main2(
     }
     n_infostates = len(all_infostates)
 
-    solver = cfr_class(root_state, regret_minimizer, verbose=do_print and not tqdm_print, **solver_kwargs)
+    solver = cfr_class(
+        root_state,
+        regret_minimizer,
+        verbose=do_print and not tqdm_print,
+        **solver_kwargs,
+    )
 
     gen = range(n_iter)
-    for i in (gen if not tqdm_print else tqdm(gen)):
+    for i in gen if not tqdm_print else tqdm(gen):
         solver.iterate()
 
-        if sum(map(lambda p: len(p), solver.average_policy())) == n_infostates:
-            avg_policy = solver.average_policy()
+        avg_policy = solver.average_policy()
+        if sum(map(lambda p: len(p), avg_policy)) == n_infostates:
             expl_values.append(
                 exploitability.exploitability(
                     game,
@@ -155,11 +161,11 @@ def main2(
 
 
 if __name__ == "__main__":
-    n_iters = 200
-    for minimizer in (rm.RegretMatcherPlus, rm.RegretMatcher):
+    n_iters = 2000
+    for minimizer in (rm.RegretMatcher, rm.RegretMatcherPlus):
         main2(
             n_iters,
-            CFRPlus2,
+            ChanceSamplingCFR2,
             regret_minimizer=minimizer,
             simultaneous_updates=False,
             do_print=False,

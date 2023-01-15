@@ -89,7 +89,7 @@ def predictive_regret_matching_plus(prediction, policy, regret_dict):
 # dict_ty = types.DictType(types.int64, types.unicode_type)
 #
 # specBase = [('cumulative_regret', NbDict.empty()),]
-class RegretMinimizer(ABC):
+class ExternalRegretMinimizer(ABC):
     def __init__(self, actions: Iterable[Action]):
         self.cumulative_regret = {a: 0.0 for a in actions}
         self.recommendation: Dict[Action, Probability] = {}
@@ -106,7 +106,7 @@ class RegretMinimizer(ABC):
         raise NotImplementedError("'observe_loss' is not implemented.")
 
 
-class RegretMatcher(RegretMinimizer):
+class RegretMatcher(ExternalRegretMinimizer):
     def __init__(self, actions: Iterable[Action]):
         actions = list(actions)
         uniform_prob = 1.0 / len(actions)

@@ -1,4 +1,4 @@
-from typing import Dict, Mapping
+from typing import Dict, Mapping, Type
 
 import pyspiel
 
@@ -12,10 +12,18 @@ from cfr_discounted2 import DiscountedCFR2
 class CFRPlus2(DiscountedCFR2):
     def __init__(
         self,
+        root_state: pyspiel.State,
+        regret_minimizer_type: Type[rm.ExternalRegretMinimizer] = rm.RegretMatcherPlus,
         *args,
         **kwargs,
     ):
         kwargs["simultaneous_updates"] = False
         super().__init__(
-            *args, **kwargs, alpha=float("inf"), beta=-float("inf"), gamma=1
+            root_state,
+            regret_minimizer_type,
+            *args,
+            alpha=float("inf"),
+            beta=-float("inf"),
+            gamma=1,
+            **kwargs,
         )
