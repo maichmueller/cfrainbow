@@ -12,6 +12,8 @@ from cfr_monte_carlo_chance_sampling2 import ChanceSamplingCFR2
 from cfr import CFR
 from cfr_discounted import DiscountedCFR
 from cfr_plus import CFRPlus
+from cfr_pure import PureCFR
+from cfr_pure2 import PureCFR2
 from utils import (
     all_states_gen,
     print_final_policy_profile,
@@ -82,8 +84,13 @@ def main(
                     print(
                         f"---------------------------------------------------------------"
                     )
-    if do_print and game_name == "kuhn_poker":
-        print_final_policy_profile(solver.average_policy())
+    avg_policy = solver.average_policy()
+    if (
+        do_print
+        and game_name == "kuhn_poker"
+        and sum(map(lambda p: len(p), solver.average_policy())) == n_infostates
+    ):
+        print_final_policy_profile(avg_policy)
 
     return expl_values
 
@@ -98,11 +105,12 @@ def main2(
     only_final_expl_print: bool = False,
     **kwargs,
 ):
-    # get all kwargs that can be found in the parent classes' or the given class's __init__ func
+    # get all kwargs that can be found in the parent classes' and the given class's __init__ func
     possible_kwargs = {}
     for cls in inspect.getmro(cfr_class):
         possible_kwargs |= inspect.signature(cls.__init__).parameters
     solver_kwargs = {k: v for k, v in kwargs.items() if k in possible_kwargs}
+
     if do_print:
         print(
             f"Running {cfr_class.__name__} "
@@ -154,21 +162,30 @@ def main2(
                     print(
                         f"---------------------------------------------------------------"
                     )
-    if (do_print or only_final_expl_print) and game_name == "kuhn_poker":
+
+    avg_policy = solver.average_policy()
+    if (
+        (do_print or only_final_expl_print)
+        and game_name == "kuhn_poker"
+        and sum(map(lambda p: len(p), avg_policy)) == n_infostates
+    ):
         print_final_policy_profile(solver.average_policy())
 
     return expl_values
 
 
 if __name__ == "__main__":
-    n_iters = 2000
-    for minimizer in (rm.RegretMatcher, rm.RegretMatcherPlus):
+    n_iters = 1000
+    # main(n_iters, PureCFR, simultaneous_updates=False, do_print=True, seed=0)
+    print("")
+    for minimizer in (rm.RegretMatcher,):
         main2(
             n_iters,
-            ChanceSamplingCFR2,
+            CFR2,
             regret_minimizer=minimizer,
-            simultaneous_updates=False,
-            do_print=False,
-            tqdm_print=True,
-            only_final_expl_print=True,
+            alternating=True,
+            do_print=True,
+            tqdm_print=False,
+            only_final_expl_print=False,
+            seed=0,
         )

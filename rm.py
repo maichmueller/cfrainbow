@@ -90,7 +90,7 @@ def predictive_regret_matching_plus(prediction, policy, regret_dict):
 #
 # specBase = [('cumulative_regret', NbDict.empty()),]
 class ExternalRegretMinimizer(ABC):
-    def __init__(self, actions: Iterable[Action]):
+    def __init__(self, actions: Iterable[Action], *args, **kwargs):
         self.cumulative_regret = {a: 0.0 for a in actions}
         self.recommendation: Dict[Action, Probability] = {}
         self._recommendation_computed: bool = False

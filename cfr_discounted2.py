@@ -22,7 +22,9 @@ class DiscountedCFR2(CFR2):
         gamma: float = 2,
         **kwargs,
     ):
-        super().__init__(root_state, regret_minimizer_type, *args, **kwargs)
+        super().__init__(
+            root_state, regret_minimizer_type, *args, **kwargs, alpha=alpha, beta=beta
+        )
         self.alpha = alpha
         self.beta = beta
         self.gamma = gamma

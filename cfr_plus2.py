@@ -17,13 +17,17 @@ class CFRPlus2(DiscountedCFR2):
         *args,
         **kwargs,
     ):
-        kwargs["simultaneous_updates"] = False
+        kwargs.update(
+            dict(
+                simultaneous_updates=False,
+                alpha=float("inf"),
+                beta=-float("inf"),
+                gamma=1.,
+            )
+        )
         super().__init__(
             root_state,
             regret_minimizer_type,
             *args,
-            alpha=float("inf"),
-            beta=-float("inf"),
-            gamma=1,
             **kwargs,
         )

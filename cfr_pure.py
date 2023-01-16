@@ -75,7 +75,20 @@ class PureCFR:
             if self._simultaneous_updates
             else None
         )
+        print("Plan  :", sorted(list(self.plan.items()), key=lambda x: x[0]))
+        print(
+            "Regret:",
+            {
+                infostate: {a: r for a, r in regret.items()}
+                for infostate, regret in self.regret_table[0].items()
+            }
+            | {
+                infostate: {a: r for a, r in regret.items()}
+                for infostate, regret in self.regret_table[1].items()
+            },
+        )
 
+        print("Traversing player", updating_player)
         self.plan.clear()
         values = self._traverse(
             self.root_state.clone(), updating_player, root_reach_probabilities
@@ -93,9 +106,6 @@ class PureCFR:
         if state.is_terminal():
             return state.returns()
 
-        current_player = state.current_player()
-        action_values = {}
-
         if state.is_chance_node():
             outcomes_probs = state.chance_outcomes()
             outcome = sample_on_policy(
@@ -107,8 +117,14 @@ class PureCFR:
                 state.child(int(outcome)), updating_player, reach_prob
             )
 
+        current_player = state.current_player()
         infostate = self._get_information_state(current_player, state)
+
         actions = state.legal_actions()
+
+        if infostate not in self.regret_table[current_player]:
+            self.regret_table[current_player][infostate] = {a: 0.0 for a in actions}
+
         player_policy = self._get_current_policy(current_player, infostate, actions)
 
         sampled_action = self._get_sampled_action(infostate, player_policy)
@@ -116,8 +132,8 @@ class PureCFR:
         if self._simultaneous_updates or current_player == updating_player:
             child_reach_prob = reach_prob
 
+            action_values = {}
             for action in actions:
-
                 if self._simultaneous_updates:
                     child_reach_prob = deepcopy(reach_prob)
                     child_reach_prob[current_player] *= player_policy[action]
@@ -141,6 +157,12 @@ class PureCFR:
                 if self._simultaneous_updates
                 else 1.0
             )
+            regs = {
+                action: prob_weight
+                * (action_vs[current_player] - state_value[current_player])
+                for action, action_vs in action_values.items()
+            }
+            print("Regret increments:", regs)
             for action, action_vs in action_values.items():
                 regrets[action] += prob_weight * (
                     action_vs[current_player] - state_value[current_player]

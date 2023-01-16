@@ -8,10 +8,11 @@ from type_aliases import Action, Infostate, Probability, Regret, Value
 
 class LinearCFR2(DiscountedCFR2):
     def __init__(self, *args, **kwargs):
-        super().__init__(
-            *args,
-            **kwargs,
-            alpha=1.0,
-            beta=1.0,
-            gamma=1.0,
+        kwargs.update(
+            dict(
+                alpha=1.0,
+                beta=1.0,
+                gamma=1.0,
+            )
         )
+        super().__init__(*args, **kwargs)

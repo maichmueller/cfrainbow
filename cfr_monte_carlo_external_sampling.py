@@ -101,9 +101,10 @@ class ExternalSamplingMCCFR:
             state.apply_action(sampled_action)
             action_value = self._traverse(state, updating_player)
 
-            avg_policy = self.avg_policy[current_player][infostate]
-            for action, prob in player_policy[infostate].items():
-                avg_policy[action] += prob
+            if current_player == self._peek_at_next_updating_player():
+                avg_policy = self.avg_policy[current_player][infostate]
+                for action, prob in player_policy[infostate].items():
+                    avg_policy[action] += prob
 
             return action_value
 
