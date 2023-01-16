@@ -1,5 +1,7 @@
 from collections import defaultdict, deque
-from typing import Dict, Mapping, Optional, Type, Sequence, MutableMapping
+from typing import Dict, Mapping, Optional, Type, Sequence, MutableMapping, Union
+
+import numpy as np
 
 from type_aliases import Action, Infostate, Probability, Value
 from rm import ExternalRegretMinimizer
@@ -109,3 +111,16 @@ class CFRBase:
 
     def _action_value_map(self, infostate: Infostate):
         return dict()
+
+
+class StochasticCFRBase(CFRBase):
+    def __init__(
+        self,
+        *args,
+        seed: Optional[Union[int, np.random.Generator]] = None,
+        **kwargs,
+    ):
+        super().__init__(*args, **kwargs)
+
+        self.plan: Dict[Infostate, Action] = {}
+        self.rng = np.random.default_rng(seed)

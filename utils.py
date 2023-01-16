@@ -2,9 +2,11 @@ import itertools
 import warnings
 from enum import Enum
 from functools import reduce, singledispatchmethod
-from typing import Dict, List, Union
+from typing import Dict, List, Union, Any, Sequence
 
+import numpy as np
 import pyspiel
+from numba import njit
 
 import rm
 
@@ -185,8 +187,12 @@ def to_pyspiel_tab_policy(policy_list):
     )
 
 
-def sample_on_policy(values, policy, rng):
-    return rng.choice(values, p=policy)
+def sample_on_policy(values: Sequence[Any], policy: Sequence[float], rng: np.random.Generator, epsilon: float = 0.0):
+    if epsilon != 0.0:
+        uniform_prob = 1.0 / len(policy)
+        policy = [epsilon * uniform_prob + (1 - epsilon) * policy_prob for policy_prob in policy]
+    choice = rng.choice(np.arange(len(values)), p=policy)
+    return values[choice], choice, policy
 
 
 def print_kuhn_poker_policy_profile(policy_profile: List[Dict[str, Dict[int, float]]]):

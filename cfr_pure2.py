@@ -2,8 +2,7 @@ from collections import defaultdict, deque
 from copy import deepcopy
 from typing import Optional, Dict, Sequence, Union, Type, MutableMapping, Mapping
 
-from cfr2 import CFR2
-from cfr2_base import CFRBase
+from cfr2_base import StochasticCFRBase
 from rm import regret_matching, ExternalRegretMinimizer
 import pyspiel
 import numpy as np
@@ -12,17 +11,14 @@ from utils import sample_on_policy, counterfactual_reach_prob
 from type_aliases import Action, Infostate, Probability, Regret, Value
 
 
-class PureCFR2(CFRBase):
+class PureCFR2(StochasticCFRBase):
     def __init__(
         self,
         *args,
-        seed: Optional[Union[int, np.random.Generator]] = None,
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
-
         self.plan: Dict[Infostate, Action] = {}
-        self.rng = np.random.default_rng(seed)
 
     def iterate(
         self,
@@ -133,7 +129,7 @@ class PureCFR2(CFRBase):
     ):
         if infostate not in self.plan:
             actions = self.action_list(infostate)
-            self.plan[infostate] = sample_on_policy(
+            self.plan[infostate], _, _ = sample_on_policy(
                 values=actions,
                 policy=[player_policy[action] for action in actions],
                 rng=self.rng,

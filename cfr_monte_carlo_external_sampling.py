@@ -91,7 +91,7 @@ class ExternalSamplingMCCFR:
                 state_value += player_policy[infostate][action] * action_values[action]
             curr_regret_table = regret_table[infostate]
             for action, regret in curr_regret_table.items():
-                curr_regret_table[action] = regret + action_values[action] - state_value
+                curr_regret_table[action] += action_values[action] - state_value
             return state_value
         else:
             policy = player_policy[infostate]

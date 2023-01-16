@@ -7,6 +7,8 @@ import rm
 from cfr2 import CFR2
 from cfr_discounted2 import DiscountedCFR2
 from cfr_linear2 import LinearCFR2
+from cfr_monte_carlo_external_sampling2 import ExternalSamplingMCCFR2
+from cfr_monte_carlo_outcome_sampling2 import OutcomeSamplingMCCFR2, MCCFRWeightingMode
 from cfr_plus2 import CFRPlus2
 from cfr_monte_carlo_chance_sampling2 import ChanceSamplingCFR2
 from cfr import CFR
@@ -175,17 +177,18 @@ def main2(
 
 
 if __name__ == "__main__":
-    n_iters = 1000
+    n_iters = 10000
     # main(n_iters, PureCFR, simultaneous_updates=False, do_print=True, seed=0)
     print("")
     for minimizer in (rm.RegretMatcher,):
         main2(
             n_iters,
-            CFR2,
+            ExternalSamplingMCCFR2,
             regret_minimizer=minimizer,
             alternating=True,
             do_print=True,
             tqdm_print=False,
             only_final_expl_print=False,
+            weighting_mode=MCCFRWeightingMode.stochastic,
             seed=0,
         )
