@@ -75,7 +75,6 @@ class CFR2(CFRBase):
             return state_value
 
     def _traverse_chance_node(self, state, reach_prob, updating_player):
-        action_values = {}
         state_value = np.zeros(len(self.players))
         for outcome, outcome_prob in state.chance_outcomes():
             next_state = state.child(outcome)
@@ -83,10 +82,10 @@ class CFR2(CFRBase):
             child_reach_prob = deepcopy(reach_prob)
             child_reach_prob[state.current_player()] *= outcome_prob
 
-            action_values[outcome] = self._traverse(
+            action_value = self._traverse(
                 next_state, child_reach_prob, updating_player
             )
-            state_value += outcome_prob * np.asarray(action_values[outcome])
+            state_value += outcome_prob * np.asarray(action_value)
         return state_value
 
     def _traverse_player_node(

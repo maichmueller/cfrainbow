@@ -1,14 +1,14 @@
+import cmath
+import inspect
 import itertools
 import warnings
 from enum import Enum
 from functools import reduce, singledispatchmethod
-from typing import Dict, List, Union, Any, Sequence
+from typing import Dict, List, Union, Any, Sequence, Optional, Tuple
 
 import numpy as np
 import pyspiel
-from numba import njit
-
-import rm
+from numba import njit, jit
 
 
 class KuhnAction(Enum):
@@ -58,37 +58,68 @@ def all_states_gen(
     root=None,
     include_chance_states: bool = False,
     include_terminal_states: bool = False,
+    *,
+    depth: int = cmath.inf,
     game: Union[pyspiel.Game, str] = "kuhn_poker",
 ):
     if root is None:
         root = (
             pyspiel.load_game(game) if isinstance(game, str) else game
         ).new_initial_state()
-    stack = [root]
+    stack = [(root, 0)]
     while stack:
-        s = stack.pop()
+        s, d = stack.pop()
         if s.is_terminal():
-            if include_terminal_states:
-                yield s
+            if d < depth and include_terminal_states:
+                yield s, d
             continue
         if s.is_chance_node():
             if include_chance_states:
-                yield s
+                yield s, d
             for outcome, prob in s.chance_outcomes():
-                child = s.child(outcome)
-                stack.append(child)
+                if d < depth:
+                    stack.append((s.child(outcome), d + 1))
         else:
-            yield s
+            yield s, d
             for action in s.legal_actions():
-                child = s.child(action)
-                stack.append(child)
+                if d < depth:
+                    stack.append((s.child(action), d + 1))
+
+
+def terminal_states_gen(
+    root,
+):
+    stack = [(root, 0)]
+    while stack:
+        s, d = stack.pop()
+        if s.is_terminal():
+            yield s, d
+            continue
+        for action in (
+            s.legal_actions()
+            if not s.is_chance_node()
+            else (outcome for outcome, _ in s.chance_outcomes())
+        ):
+            stack.append((s.child(action), d + 1))
+
+
+def infostates_gen(
+    root,
+):
+    for state, d in all_states_gen(root, False, False):
+        curr_player = state.current_player()
+        yield state.information_state_string(
+            curr_player
+        ), state.legal_actions(), curr_player, d
 
 
 class KuhnTensorToStr:
     def __init__(self):
         self.tensors = []
         self.strs = []
-        for state in all_states_gen():
+        for state, _ in all_states_gen(
+            root=pyspiel.load_game("kuhn_poker").new_initial_state()
+        ):
             self.tensors.append(
                 tuple(state.information_state_tensor(state.current_player()))
             )
@@ -113,7 +144,9 @@ class KuhnLeducHistoryToStr:
     def __init__(self, game_name: str = "kuhn_poker"):
         self.tensors = []
         self.strs = []
-        for state in all_states_gen(game=game_name):
+        for state, _ in all_states_gen(
+            root=pyspiel.load_game(game_name).new_initial_state()
+        ):
             self.tensors.append(tuple(self.istate_as_action_observation(state)))
             self.strs.append(state.information_state_string(state.current_player()))
 
@@ -187,10 +220,18 @@ def to_pyspiel_tab_policy(policy_list):
     )
 
 
-def sample_on_policy(values: Sequence[Any], policy: Sequence[float], rng: np.random.Generator, epsilon: float = 0.0):
+def sample_on_policy(
+    values: Sequence[Any],
+    policy: Sequence[float],
+    rng: np.random.Generator,
+    epsilon: float = 0.0,
+):
     if epsilon != 0.0:
         uniform_prob = 1.0 / len(policy)
-        policy = [epsilon * uniform_prob + (1 - epsilon) * policy_prob for policy_prob in policy]
+        policy = [
+            epsilon * uniform_prob + (1 - epsilon) * policy_prob
+            for policy_prob in policy
+        ]
     choice = rng.choice(np.arange(len(values)), p=policy)
     return values[choice], choice, policy
 
@@ -258,3 +299,11 @@ def print_final_policy_profile(policy_profile):
                     for action, prob in dist.items()
                 ),
             )
+
+
+def slice_kwargs(given_kwargs, *func):
+    return {
+        k: v
+        for k, v in given_kwargs.items()
+        if any(k in inspect.signature(f).parameters for f in func)
+    }

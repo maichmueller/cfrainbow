@@ -1,7 +1,4 @@
-
-from numba import njit, vectorize, int64
-from numba.experimental import jitclass
-from numba.core import types
+from typing import Tuple, Mapping, Set, Union
 
 
 Action = int
@@ -10,3 +7,7 @@ Regret = float
 Value = float
 Infostate = str
 
+
+NormalFormPlan = Union[Tuple[Infostate, Action], Action]
+NormalFormStrategy = Mapping[NormalFormPlan, float]
+NormalFormStrategySpace = Set[NormalFormPlan]

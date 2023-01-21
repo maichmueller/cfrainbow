@@ -6,6 +6,7 @@ from tqdm import tqdm
 import rm
 from cfr2 import CFR2
 from cfr_discounted2 import DiscountedCFR2
+from cfr_exp2 import ExponentialCFR2
 from cfr_linear2 import LinearCFR2
 from cfr_monte_carlo_external_sampling2 import ExternalSamplingMCCFR2
 from cfr_monte_carlo_outcome_sampling2 import OutcomeSamplingMCCFR2, MCCFRWeightingMode
@@ -16,12 +17,14 @@ from cfr_discounted import DiscountedCFR
 from cfr_plus import CFRPlus
 from cfr_pure import PureCFR
 from cfr_pure2 import PureCFR2
+from cfr_sampling import SamplingCFR
 from utils import (
     all_states_gen,
     print_final_policy_profile,
     print_kuhn_poker_policy_profile,
     to_pyspiel_tab_policy,
     normalize_policy_profile,
+    slice_kwargs,
 )
 import inspect
 
@@ -97,7 +100,7 @@ def main(
     return expl_values
 
 
-def main2(
+def main_nash(
     n_iter,
     cfr_class,
     regret_minimizer: type[rm.ExternalRegretMinimizer] = rm.RegretMatcher,
@@ -122,7 +125,7 @@ def main2(
         )
 
     expl_values = []
-    game = pyspiel.load_game("kuhn_poker")
+    game = pyspiel.load_game(game_name)
     root_state = game.new_initial_state()
     all_infostates = {
         state.information_state_string(state.current_player())
@@ -176,14 +179,96 @@ def main2(
     return expl_values
 
 
+def main_cce(
+    n_iter,
+    cfr_class,
+    regret_minimizer: type[rm.ExternalRegretMinimizer] = rm.RegretMatcher,
+    game_name: str = "kuhn_poker",
+    do_print: bool = True,
+    tqdm_print: bool = False,
+    only_final_expl_print: bool = False,
+    **kwargs,
+):
+    # get all kwargs that can be found in the parent classes' and the given class's __init__ func
+    # possible_kwargs = {}
+    # for cls in inspect.getmro(cfr_class):
+    #     possible_kwargs |= inspect.signature(cls.__init__).parameters
+    # solver_kwargs = {k: v for k, v in kwargs.items() if k in possible_kwargs}
+    solver_kwargs = slice_kwargs(
+        kwargs, [cls.__init__ for cls in inspect.getmro(cfr_class)]
+    )
+
+    if do_print:
+        print(
+            f"Running {cfr_class.__name__} "
+            f"with regret minimizer {regret_minimizer.__name__} "
+            f"and kwargs {solver_kwargs} "
+            f"for {n_iter} iterations."
+        )
+
+    expl_values = []
+    game = pyspiel.load_game(game_name)
+    root_state = game.new_initial_state()
+    all_infostates = {
+        state.information_state_string(state.current_player())
+        for state in all_states_gen(root=root_state.clone())
+    }
+    n_infostates = len(all_infostates)
+
+    solver = cfr_class(
+        root_state,
+        regret_minimizer,
+        verbose=do_print and not tqdm_print,
+        **solver_kwargs,
+    )
+
+    gen = range(n_iter)
+    for i in gen if not tqdm_print else tqdm(gen):
+        solver.iterate()
+
+        avg_policy = solver.average_policy()
+        if sum(map(lambda p: len(p), avg_policy)) == n_infostates:
+            expl_values.append(
+                exploitability.exploitability(
+                    game,
+                    to_pyspiel_tab_policy(avg_policy),
+                )
+            )
+
+            if ((do_print or tqdm_print) and not only_final_expl_print) or (
+                i == n_iters - 1 and only_final_expl_print
+            ):
+                print(
+                    f"-------------------------------------------------------------"
+                    f"--> Exploitability {expl_values[-1]: .5f}"
+                )
+                if "kuhn_poker" in game_name:
+                    print_kuhn_poker_policy_profile(
+                        normalize_policy_profile(avg_policy)
+                    )
+                    print(
+                        f"---------------------------------------------------------------"
+                    )
+
+    avg_policy = solver.average_policy()
+    if (
+        (do_print or only_final_expl_print)
+        and "kuhn_poker" in game_name
+        and sum(map(lambda p: len(p), avg_policy)) == n_infostates
+    ):
+        print_final_policy_profile(solver.average_policy())
+
+    return expl_values
+
+
 if __name__ == "__main__":
     n_iters = 10000
     # main(n_iters, PureCFR, simultaneous_updates=False, do_print=True, seed=0)
     print("")
     for minimizer in (rm.RegretMatcher,):
-        main2(
+        main_nash(
             n_iters,
-            ExternalSamplingMCCFR2,
+            SamplingCFR,
             regret_minimizer=minimizer,
             alternating=True,
             do_print=True,
