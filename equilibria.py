@@ -111,9 +111,10 @@ def cce_deviation_incentive(
     strategy_spaces: Sequence[NormalFormStrategySpace],
     payoff: Mapping[Tuple[NormalFormPlan], Sequence[float]],
 ):
-    r"""
-    Computes the epsilon-coarse correlated equilibrium deviation incentive for a joint normal-form distribution.
+    r"""Computes the lowest coarse correlated equilibrium deviation incentive of a joint normal-form distribution.
 
+    Notes
+    -----
     A coarse correlated equilibrium :math:`\mu` is a probability distribution over the joint normal-form strategy space
     of all players that fulfills the following criteria:
     Let :math:`S_i` be the strategy space of player :math:`i` and :math:`S_{-i}` be the strategy space of :math:`i`'s
@@ -183,6 +184,36 @@ def ce_deviation_incentive(
     strategy_spaces: Sequence[NormalFormStrategySpace],
     payoff: Mapping[Tuple[NormalFormPlan], Sequence[float]],
 ):
+    r"""Computes the lowest correlated equilibrium deviation incentive of a joint normal-form distribution.
+
+    Notes
+    -----
+    A correlated equilibrium :math:`\mu` is a probability distribution over the joint normal-form strategy space
+    of all players that fulfills the following criteria:
+    Let :math:`S_i` be the strategy space of player :math:`i` and :math:`S_{-i}` be the strategy space of :math:`i`'s
+    opponents :math:`S_1 \times \dots S_{i-1} \times S_{i+1} \times \dots \times S_n`, a probability distribution
+    :math:`\mu` over the joint strategy space :math:`S_1 \times \dots \times S_n` is an :math:`\epsilon` - CE for some
+    :math:`\epsilon > 0` iff for each player :math:`i` and :math:`\forall s_i, z_i \in S_i` with
+    :math:`\mu_i(s_i) = \sum_{s_{-i} \in S_{-i}} \mu(s_i, s_{-i})` being the marginal likelihood of s_i holds:
+
+    .. math::
+            \sum_{s_{-i} \in S_{-i}} \frac{\mu(s_i, s_{-i})}{\mu_i(s_i)} (u(z_i, s_{-i}) - u(s_i, s_{-i})) \leq \epsilon
+
+
+    Parameters
+    ----------
+    joint_distribution: NormalFormStrategy
+        the distribution whose distance to a CCE is to be evaluated.
+    strategy_spaces: Sequence[NormalFormStrategySpace]
+        the sequence of players' strategy spaces. Element i is the ith player's strategy space.
+    payoff: Mapping[Tuple[NormalFormPlan], Sequence[float]]
+        the map of normal-form plan profiles to the vector of player payoffs. Payoff index i is ith player's payoff.
+
+    Returns
+    -------
+    float
+        the maximum deviation incentive for any player and any of their strategies.
+    """
     strategy_spaces = list(strategy_spaces)
     deviation_incentive = -cmath.inf
     for player, strategy_space in enumerate(strategy_spaces):
