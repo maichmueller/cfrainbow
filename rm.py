@@ -293,6 +293,13 @@ class RegretMatcher(ExternalRegretMinimizer):
         regret_matching(self.recommendation, self.cumulative_regret)
         self._recommendation_computed = True
 
+    def observe_loss(
+        self, iteration: int, loss: Callable[[Action], float], *args, **kwargs
+    ):
+        self.observe_regret(iteration, lambda a: loss(a) * self.recommendation[a])
+        self._last_update_time = iteration
+        self._recommendation_computed = False
+
 
 class RegretMatcherPlus(RegretMatcher):
     def _ready_recommendation(self):

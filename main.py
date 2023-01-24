@@ -4,19 +4,16 @@ from open_spiel.python.algorithms import exploitability
 from tqdm import tqdm
 
 import rm
-from cfr2 import CFR2
-from cfr_discounted2 import DiscountedCFR2
-from cfr_exp2 import ExponentialCFR2
-from cfr_linear2 import LinearCFR2
-from cfr_monte_carlo_external_sampling2 import ExternalSamplingMCCFR2
-from cfr_monte_carlo_outcome_sampling2 import OutcomeSamplingMCCFR2, MCCFRWeightingMode
-from cfr_plus2 import CFRPlus2
-from cfr_monte_carlo_chance_sampling2 import ChanceSamplingCFR2
 from cfr import CFR
 from cfr_discounted import DiscountedCFR
+from cfr_exp import ExponentialCFR
+from cfr_linear import LinearCFR
+from cfr_monte_carlo_external_sampling import ExternalSamplingMCCFR
+from cfr_monte_carlo_outcome_sampling import OutcomeSamplingMCCFR, MCCFRWeightingMode
 from cfr_plus import CFRPlus
+from cfr_monte_carlo_chance_sampling import ChanceSamplingCFR
+
 from cfr_pure import PureCFR
-from cfr_pure2 import PureCFR2
 from cfr_sampling import SamplingCFR
 from utils import (
     all_states_gen,
@@ -51,7 +48,7 @@ def main(
     root_state = game.new_initial_state()
     all_infostates = {
         state.information_state_string(state.current_player())
-        for state in all_states_gen(root=root_state.clone())
+        for state, _ in all_states_gen(root=root_state.clone())
     }
     n_infostates = len(all_infostates)
     n_players = list(range(root_state.num_players()))
@@ -101,8 +98,8 @@ def main(
 
 
 def main_nash(
-    n_iter,
     cfr_class,
+    n_iter,
     regret_minimizer: type[rm.ExternalRegretMinimizer] = rm.RegretMatcher,
     game_name: str = "kuhn_poker",
     do_print: bool = True,
@@ -111,11 +108,9 @@ def main_nash(
     **kwargs,
 ):
     # get all kwargs that can be found in the parent classes' and the given class's __init__ func
-    possible_kwargs = {}
-    for cls in inspect.getmro(cfr_class):
-        possible_kwargs |= inspect.signature(cls.__init__).parameters
-    solver_kwargs = {k: v for k, v in kwargs.items() if k in possible_kwargs}
-
+    solver_kwargs = slice_kwargs(
+        kwargs, *[cls.__init__ for cls in inspect.getmro(cfr_class)]
+    )
     if do_print:
         print(
             f"Running {cfr_class.__name__} "
@@ -129,7 +124,7 @@ def main_nash(
     root_state = game.new_initial_state()
     all_infostates = {
         state.information_state_string(state.current_player())
-        for state in all_states_gen(root=root_state.clone())
+        for state, _ in all_states_gen(root=root_state.clone())
     }
     n_infostates = len(all_infostates)
 
@@ -154,7 +149,7 @@ def main_nash(
             )
 
             if ((do_print or tqdm_print) and not only_final_expl_print) or (
-                i == n_iters - 1 and only_final_expl_print
+                i == n_iter - 1 and only_final_expl_print
             ):
                 print(
                     f"-------------------------------------------------------------"
@@ -180,8 +175,8 @@ def main_nash(
 
 
 def main_cce(
-    n_iter,
     cfr_class,
+    n_iter,
     regret_minimizer: type[rm.ExternalRegretMinimizer] = rm.RegretMatcher,
     game_name: str = "kuhn_poker",
     do_print: bool = True,
@@ -195,7 +190,7 @@ def main_cce(
     #     possible_kwargs |= inspect.signature(cls.__init__).parameters
     # solver_kwargs = {k: v for k, v in kwargs.items() if k in possible_kwargs}
     solver_kwargs = slice_kwargs(
-        kwargs, [cls.__init__ for cls in inspect.getmro(cfr_class)]
+        kwargs, *[cls.__init__ for cls in inspect.getmro(cfr_class)]
     )
 
     if do_print:
@@ -236,7 +231,7 @@ def main_cce(
             )
 
             if ((do_print or tqdm_print) and not only_final_expl_print) or (
-                i == n_iters - 1 and only_final_expl_print
+                i == n_iter - 1 and only_final_expl_print
             ):
                 print(
                     f"-------------------------------------------------------------"
@@ -263,17 +258,17 @@ def main_cce(
 
 if __name__ == "__main__":
     n_iters = 10000
-    # main(n_iters, PureCFR, simultaneous_updates=False, do_print=True, seed=0)
+    # main(n_iters, ExponentialCFR, simultaneous_updates=True, do_print=True, seed=0)
     print("")
     for minimizer in (rm.RegretMatcher,):
         main_nash(
+            OutcomeSamplingMCCFR,
             n_iters,
-            SamplingCFR,
             regret_minimizer=minimizer,
             alternating=True,
             do_print=True,
             tqdm_print=False,
             only_final_expl_print=False,
-            weighting_mode=MCCFRWeightingMode.stochastic,
+            weighting_mode=MCCFRWeightingMode.optimistic,
             seed=0,
         )

@@ -8,6 +8,7 @@ from typing import Sequence, Dict, Mapping, Tuple, Set, Optional
 import numpy as np
 import pyspiel
 
+from queue import Queue
 from type_aliases import (
     Infostate,
     Action,
@@ -17,93 +18,6 @@ from type_aliases import (
     Probability,
 )
 from utils import all_states_gen, infostates_gen
-
-
-class InformedActionList:
-    informed_tuple = namedtuple("informed_tuple", "action infostate depth")
-
-    def __init__(self, infostate: Infostate, actions: Sequence[Action], depth: int):
-        self.infostate: Infostate = infostate
-        self.actions: Sequence[Action] = actions
-        self.depth: int = depth
-
-    def __iter__(self):
-        return iter(
-            self.informed_tuple(action, self.infostate, self.depth)
-            for action in self.actions
-        )
-
-    def __repr__(self):
-        return f"{self.infostate}, {self.actions}, {self.depth}"
-
-
-def normal_form_strategy_space(
-    game: pyspiel.Game, *players: int
-) -> Dict[int, Set[NormalFormPlan]]:
-    if not players:
-        players = list(range(game.num_players()))
-    action_spaces = {p: [] for p in players}
-    strategy_spaces = {}
-    seen_infostates = set()
-    for state, depth in all_states_gen(root=game.new_initial_state()):
-        player = state.current_player()
-        if player in players:
-            infostate = state.information_state_string(player)
-            if infostate not in seen_infostates:
-                action_spaces[player].append(
-                    InformedActionList(infostate, state.legal_actions(), depth)
-                )
-                seen_infostates.add(infostate)
-
-    for player, action_space in action_spaces.items():
-        strategy_spaces[player] = set(
-            tuple(
-                (sorted_plan.infostate, sorted_plan.action)
-                for sorted_plan in sorted(plan, key=lambda x: x.depth)
-            )
-            for plan in itertools.product(
-                *sorted(
-                    action_space,
-                    key=lambda x: x.depth * 1e8 + sum(ord(c) for c in x.infostate),
-                )
-            )
-        )
-    return strategy_spaces
-
-
-def normal_form_expected_payoff(game: pyspiel.Game, *joint_plan: NormalFormPlan):
-    joint_plan_dict = {
-        infostate: action for infostate, action in itertools.chain(*joint_plan)
-    }
-    root = game.new_initial_state()
-    stack = [(root, 1.0)]
-    expected_payoff = np.zeros(root.num_players())
-    while stack:
-        s, chance = stack.pop()
-        if s.is_chance_node():
-            for outcome, prob in s.chance_outcomes():
-                stack.append((s.child(outcome), chance * prob))
-        elif s.is_terminal():
-            expected_payoff += chance * np.asarray(s.returns())
-        else:
-            infostate = s.information_state_string(s.current_player())
-            if infostate not in joint_plan_dict:
-                # the infostate not being part of the plan means this is a reduced plan and the current point is
-                # unreachable by the player due to previous decisions. The expected outcome of this is hence simply 0,
-                # since it is never reached.
-                continue
-            s.apply_action(joint_plan_dict[infostate])
-            stack.append((s, chance))
-    return expected_payoff
-
-
-def normal_form_expected_payoff_table(
-    game: pyspiel.Game, strategy_spaces: Sequence[NormalFormStrategySpace]
-):
-    payoffs: Dict[Tuple[NormalFormPlan], Sequence[float]] = dict()
-    for joint_profile in itertools.product(*strategy_spaces):
-        payoffs[joint_profile] = normal_form_expected_payoff(game, *joint_profile)
-    return payoffs
 
 
 def cce_deviation_incentive(
@@ -203,7 +117,7 @@ def ce_deviation_incentive(
     Parameters
     ----------
     joint_distribution: NormalFormStrategy
-        the distribution whose distance to a CCE is to be evaluated.
+        the distribution whose distance to a CE is to be evaluated.
     strategy_spaces: Sequence[NormalFormStrategySpace]
         the sequence of players' strategy spaces. Element i is the ith player's strategy space.
     payoff: Mapping[Tuple[NormalFormPlan], Sequence[float]]

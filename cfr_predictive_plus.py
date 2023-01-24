@@ -2,7 +2,7 @@ from collections.abc import MutableMapping
 from enum import Enum
 from typing import List, Dict, Sequence
 
-from cfr_discounted2 import DiscountedCFR2
+from cfr_discounted import DiscountedCFR2
 from type_aliases import Infostate, Value, Action
 
 

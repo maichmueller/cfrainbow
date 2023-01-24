@@ -110,7 +110,7 @@ def infostates_gen(
         curr_player = state.current_player()
         yield state.information_state_string(
             curr_player
-        ), state.legal_actions(), curr_player, d
+        ), curr_player, state.legal_actions(), d
 
 
 class KuhnTensorToStr:
@@ -302,8 +302,7 @@ def print_final_policy_profile(policy_profile):
 
 
 def slice_kwargs(given_kwargs, *func):
-    return {
-        k: v
-        for k, v in given_kwargs.items()
-        if any(k in inspect.signature(f).parameters for f in func)
-    }
+    possible_kwargs = {}
+    for f in func:
+        possible_kwargs |= inspect.signature(f).parameters
+    return {k: v for k, v in given_kwargs.items() if k in possible_kwargs}

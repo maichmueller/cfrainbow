@@ -1,4 +1,3 @@
-import itertools
 import os
 from copy import deepcopy
 from typing import Dict, List, Optional
@@ -16,11 +15,9 @@ from collections import Counter, defaultdict
 from multiprocessing import Pool, cpu_count
 from open_spiel.python.algorithms import exploitability
 
-from cfr_monte_carlo_chance_sampling import ChanceSamplingCFR
-from cfr_monte_carlo_external_sampling import ExternalSamplingMCCFR
-from cfr_monte_carlo_outcome_sampling import OutcomeSamplingMCCFR
-from rm import all_states_gen
+from main import main_nash
 from utils import (
+    all_states_gen,
     to_pyspiel_tab_policy,
     print_final_policy_profile,
     print_kuhn_poker_policy_profile,
@@ -32,6 +29,9 @@ from cfr_plus import CFRPlus
 from cfr_discounted import DiscountedCFR
 from cfr_exp import ExponentialCFR
 from cfr_pure import PureCFR
+from cfr_monte_carlo_chance_sampling import ChanceSamplingCFR
+from cfr_monte_carlo_external_sampling import ExternalSamplingMCCFR
+from cfr_monte_carlo_outcome_sampling import OutcomeSamplingMCCFR
 
 
 def plot_cfr_convergence(
@@ -77,16 +77,7 @@ def plot_cfr_convergence(
             max_iters = max(max_iters, len(expl_list))
             linestyle = "--" if "(A)" in algo else "-"
             color = cmap(i)
-            if len(expl_list) == 1:
-                (plotline,) = ax.plot(
-                    x[iters_run - len(expl_list[0]) :],
-                    expl_list[0],
-                    label=algo,
-                    linewidth=linewidth,
-                    linestyle=linestyle,
-                    color=color,
-                )
-            else:
+            if len(expl_list) != 1:
                 iteration_counts = np.flip(
                     np.sort(np.asarray([len(vals) for vals in expl_list])), 0
                 )
@@ -165,11 +156,24 @@ def plot_cfr_convergence(
                 segments = np.concatenate([points[:-1], points[1:]], axis=1)
                 if linestyle == "--":
                     lc = LineCollection(
-                        [s for i, s in enumerate(segments)],
+                        [s for i, s in enumerate(segments) if i % 19 > 7],
                         linewidths=relative_freq_per_iter * linewidth,
                         color=color,
                         alpha=relative_freq_per_iter,
                     )
+                    # lc = LineCollection(
+                    #     segments,
+                    #     linewidths=relative_freq_per_iter * linewidth,
+                    #     color=color,
+                    #     alpha=relative_freq_per_iter,
+                    # )
+                    # ax.plot(
+                    #     x_to_plot,
+                    #     mean_to_plot,
+                    #     linewidth=linewidth,
+                    #     linestyle=linestyle,
+                    #     color=color,
+                    # )
                     ax.add_collection(lc)
                 else:
                     lc = LineCollection(
@@ -199,6 +203,19 @@ def plot_cfr_convergence(
                     alpha=0.1,
                 )
 
+        for i, (algo, expl_list) in enumerate(algorithm_to_expl_lists):
+            color = cmap(i)
+            if len(expl_list) == 1:
+                ax.plot(
+                    x[iters_run - len(expl_list[0]) :],
+                    expl_list[0],
+                    label=algo,
+                    linewidth=linewidth,
+                    linestyle=linestyle,
+                    color=color,
+                )
+
+
         ax.set_xlabel("Iteration")
         ax.set_ylabel("Exploitability")
         ax.set_yscale("log", base=10)
@@ -216,7 +233,7 @@ def plot_cfr_convergence(
         if not save:
             plt.show(bbox_inches="tight")
         else:
-            plt.savefig(f"{save_name}_iters_{iters_run}.png", bbox_inches="tight")
+            plt.savefig(f"{save_name}_iters_{iters_run}.pdf", bbox_inches="tight")
 
 
 def running_mean(values, window_size: int = 10):
@@ -226,83 +243,9 @@ def running_mean(values, window_size: int = 10):
     ]
 
 
-def main(
-    cfr_class,
-    n_iter: int,
-    game_name: str = "kuhn_poker",
-    do_print: bool = True,
-    **kwargs,
-):
-    if do_print:
-        print(
-            f"Running class {cfr_class.__name__} with kwargs {kwargs} for {n_iter} iterations."
-        )
-
-    game = pyspiel.load_game(game_name)
-    root_state = game.new_initial_state()
-    all_infostates = {
-        state.information_state_string(state.current_player())
-        for state in all_states_gen(root=root_state.clone())
-    }
-    n_infostates = len(all_infostates)
-    n_players = list(range(root_state.num_players()))
-
-    solver = cfr_class(
-        root_state,
-        curr_policy_list=[{} for _ in n_players],
-        average_policy_list=[{} for _ in n_players],
-        verbose=do_print,
-        **kwargs,
-    )
-    simultaneous_updates = kwargs.get("simultaneous_updates", False)
-
-    return run_solver(
-        solver,
-        n_iter,
-        game,
-        game_name,
-        simultaneous_updates,
-        n_infostates,
-        do_print,
-    )
-
-
-def run_solver(
-    solver, n_iter, game, game_name, simultaneous_updates, n_infostates, do_print
-):
-    expl_values = []
-    for i in range(n_iter):
-        solver.iterate()
-
-        if sum(map(lambda p: len(p), solver.average_policy())) == n_infostates and (
-            simultaneous_updates or (not simultaneous_updates and i > 1)
-        ):
-            avg_policy = solver.average_policy()
-            expl_values.append(
-                exploitability.exploitability(
-                    game,
-                    to_pyspiel_tab_policy(avg_policy),
-                )
-            )
-
-            if do_print:
-                print(
-                    f"-------------------------------------------------------------"
-                    f"--> Exploitability {expl_values[-1]: .5f}"
-                )
-                if game_name == "kuhn_poker":
-                    print_kuhn_poker_policy_profile(deepcopy(avg_policy))
-                    print(
-                        f"---------------------------------------------------------------"
-                    )
-    if do_print and game_name == "kuhn_poker":
-        print_final_policy_profile(solver.average_policy())
-    return expl_values
-
-
 def main_wrapper(args):
     name, pos_args, kwargs = args
-    return name, main(*pos_args, **kwargs)
+    return name, main_nash(*pos_args, **kwargs)
 
 
 if __name__ == "__main__":
@@ -323,7 +266,7 @@ if __name__ == "__main__":
                         n_iters,
                         {
                             "game_name": game,
-                            "simultaneous_updates": False,
+                            "alternating": True,
                             "do_print": verbose,
                         },
                     ),
@@ -332,7 +275,7 @@ if __name__ == "__main__":
                         n_iters,
                         {
                             "game_name": game,
-                            "simultaneous_updates": True,
+                            "alternating": False,
                             "do_print": verbose,
                         },
                     ),
@@ -341,7 +284,7 @@ if __name__ == "__main__":
                         n_iters,
                         {
                             "game_name": game,
-                            "simultaneous_updates": False,
+                            "alternating": True,
                             "do_print": verbose,
                         },
                     ),
@@ -350,7 +293,7 @@ if __name__ == "__main__":
                         n_iters,
                         {
                             "game_name": game,
-                            "simultaneous_updates": True,
+                            "alternating": False,
                             "do_print": verbose,
                         },
                     ),
@@ -360,7 +303,7 @@ if __name__ == "__main__":
                         {
                             "game_name": game,
                             "stochastic_solver": True,
-                            "simultaneous_updates": False,
+                            "alternating": True,
                             "do_print": verbose,
                         },
                     ),
@@ -370,7 +313,7 @@ if __name__ == "__main__":
                         {
                             "game_name": game,
                             "stochastic_solver": True,
-                            "simultaneous_updates": True,
+                            "alternating": False,
                             "do_print": verbose,
                         },
                     ),
@@ -381,7 +324,7 @@ if __name__ == "__main__":
                             "game_name": game,
                             "stochastic_solver": True,
                             "weighting_mode": 2,
-                            "simultaneous_updates": False,
+                            "alternating": True,
                             "do_print": verbose,
                         },
                     ),
@@ -392,7 +335,7 @@ if __name__ == "__main__":
                             "game_name": game,
                             "stochastic_solver": True,
                             "weighting_mode": 2,
-                            "simultaneous_updates": True,
+                            "alternating": False,
                             "do_print": verbose,
                         },
                     ),
@@ -402,7 +345,7 @@ if __name__ == "__main__":
                         {
                             "game_name": game,
                             "stochastic_solver": True,
-                            "simultaneous_updates": False,
+                            "alternating": True,
                             "do_print": verbose,
                         },
                     ),
@@ -412,7 +355,7 @@ if __name__ == "__main__":
                         {
                             "game_name": game,
                             "stochastic_solver": True,
-                            "simultaneous_updates": False,
+                            "alternating": True,
                             "do_print": verbose,
                         },
                     ),
@@ -422,7 +365,7 @@ if __name__ == "__main__":
                         {
                             "game_name": game,
                             "stochastic_solver": True,
-                            "simultaneous_updates": True,
+                            "alternating": False,
                             "do_print": verbose,
                         },
                     ),
@@ -436,7 +379,7 @@ if __name__ == "__main__":
                         n_iters,
                         {
                             "game_name": game,
-                            "simultaneous_updates": False,
+                            "alternating": True,
                             "do_print": verbose,
                         },
                     ),
@@ -445,7 +388,7 @@ if __name__ == "__main__":
                         n_iters,
                         {
                             "game_name": game,
-                            "simultaneous_updates": True,
+                            "alternating": False,
                             "do_print": verbose,
                         },
                     ),
@@ -454,7 +397,7 @@ if __name__ == "__main__":
                         n_iters,
                         {
                             "game_name": game,
-                            "simultaneous_updates": False,
+                            "alternating": True,
                             "do_regret_matching_plus": True,
                             "do_print": verbose,
                         },
@@ -464,7 +407,7 @@ if __name__ == "__main__":
                         n_iters,
                         {
                             "game_name": game,
-                            "simultaneous_updates": True,
+                            "alternating": False,
                             "do_regret_matching_plus": True,
                             "do_print": verbose,
                         },
@@ -474,7 +417,7 @@ if __name__ == "__main__":
                         n_iters,
                         {
                             "game_name": game,
-                            "simultaneous_updates": False,
+                            "alternating": True,
                             "do_print": verbose,
                         },
                     ),
@@ -483,7 +426,7 @@ if __name__ == "__main__":
                         n_iters,
                         {
                             "game_name": game,
-                            "simultaneous_updates": True,
+                            "alternating": False,
                             "do_print": verbose,
                         },
                     ),
@@ -492,7 +435,7 @@ if __name__ == "__main__":
                         n_iters,
                         {
                             "game_name": game,
-                            "simultaneous_updates": False,
+                            "alternating": True,
                             "do_regret_matching_plus": True,
                             "do_print": verbose,
                         },
@@ -502,7 +445,7 @@ if __name__ == "__main__":
                         n_iters,
                         {
                             "game_name": game,
-                            "simultaneous_updates": True,
+                            "alternating": False,
                             "do_regret_matching_plus": True,
                             "do_print": verbose,
                         },

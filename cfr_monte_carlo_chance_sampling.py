@@ -12,7 +12,7 @@ class ChanceSamplingCFR(CFR):
         super().__init__(*args, **kwargs)
         self.rng: np.random.Generator = np.random.default_rng(seed)
 
-    def _traverse_chance_node(self, state, reach_prob, updating_player, action_values):
+    def _traverse_chance_node(self, state, reach_prob, updating_player):
         outcome, outcome_prob = self.rng.choice(state.chance_outcomes())
         state.apply_action(int(outcome))
         return self._traverse(state, reach_prob, updating_player)

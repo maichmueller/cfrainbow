@@ -2,8 +2,8 @@ from collections import defaultdict, deque
 from copy import deepcopy
 from typing import Optional, Dict, Sequence, Union, Type, MutableMapping, Mapping
 
-from cfr2_base import StochasticCFRBase
-from cfr_pure2 import PureCFR2
+from cfr_base import StochasticCFRBase
+from cfr_pure import PureCFR
 from rm import regret_matching, ExternalRegretMinimizer
 import pyspiel
 import numpy as np
@@ -12,7 +12,7 @@ from utils import sample_on_policy, counterfactual_reach_prob
 from type_aliases import Action, Infostate, Probability, Regret, Value
 
 
-class SamplingCFR(PureCFR2):
+class SamplingCFR(PureCFR):
     def __init__(
         self,
         *args,

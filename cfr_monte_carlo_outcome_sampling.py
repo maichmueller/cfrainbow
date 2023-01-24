@@ -5,15 +5,12 @@ from typing import Optional, Dict, Union
 import numpy as np
 
 import pyspiel
-from open_spiel.python.algorithms import exploitability
 
-import rm
-from rm import regret_matching
+from cfr_base import StochasticCFRBase
+from type_aliases import Probability, Action
 from utils import (
     counterfactual_reach_prob,
-    to_pyspiel_tab_policy,
-    print_kuhn_poker_policy_profile,
-    print_final_policy_profile,
+    sample_on_policy,
 )
 
 
@@ -23,88 +20,43 @@ class MCCFRWeightingMode(Enum):
     stochastic = 2
 
 
-class OutcomeSamplingMCCFR:
+class OutcomeSamplingMCCFR(StochasticCFRBase):
     def __init__(
-        self,
-        root_state: pyspiel.State,
-        curr_policy_list: list[Dict[str, Dict[int, float]]],
-        average_policy_list: list[Dict[str, Dict[int, float]]],
-        *,
-        weighting_mode: MCCFRWeightingMode,
-        epsilon: float = 0.6,
-        simultaneous_updates: bool,
-        verbose: bool = False,
-        seed: Optional[Union[int, np.random.Generator]] = None,
+        self, *args, weighting_mode: MCCFRWeightingMode, epsilon: float = 0.6, **kwargs
     ):
-        self.root_state = root_state
-        self.n_players = list(range(root_state.num_players()))
-        self.weighting_mode = weighting_mode
-        self.regret_table: list[Dict[str, Dict[int, float]]] = [
-            {} for _ in self.n_players
-        ]
-        self.curr_policy = curr_policy_list
-        self.avg_policy = average_policy_list
-        self.iteration = 0
-        self.last_visit: defaultdict[str, int] = defaultdict(int)
+        super().__init__(*args, **kwargs)
+        self.weighting_mode = MCCFRWeightingMode(weighting_mode)
         self.weight_storage: Dict[str, Dict[int, float]] = dict()
         self.epsilon = epsilon
-        self.rng: np.random.Generator = np.random.default_rng(seed)
-        self._simultaneous_updates = simultaneous_updates
-        self._verbose = verbose
+        self.last_visit: defaultdict[str, int] = defaultdict(int)
 
-    def average_policy(self):
-        return self.avg_policy
-
-    def _get_current_policy(self, current_player, infostate):
-        return self.curr_policy[current_player][infostate]
-
-    def _get_average_policy(self, current_player, infostate):
-        if infostate not in (player_policy := self.avg_policy[current_player]):
-            player_policy[infostate] = defaultdict(float)
-        return player_policy[infostate]
-
-    def _get_information_state(self, current_player, state):
-        infostate = state.information_state_string(current_player)
-        if infostate not in (player_policy := self.curr_policy[current_player]):
-            las = state.legal_actions()
-            player_policy[infostate] = {action: 1 / len(las) for action in las}
-        return infostate
-
-    def _get_regret_table(self, current_player: int, infostate: str):
-        if infostate not in (table := self.regret_table[current_player]):
-            table[infostate] = defaultdict(float)
-        return table[infostate]
-
-    def _get_weight_storage(self, infostate):
+    def _weight(self, infostate):
         if infostate not in self.weight_storage:
             self.weight_storage[infostate] = defaultdict(float)
         return self.weight_storage[infostate]
 
     def iterate(
         self,
-        updating_player: Optional[int] = None,
+        traversing_player: Optional[int] = None,
     ):
+        traversing_player = self._cycle_updating_player(traversing_player)
+
         if self._verbose:
             print(
                 "\nIteration",
-                self.iteration
-                if self._simultaneous_updates
-                else f"{self.iteration // 2} {(self.iteration % 2 + 1)}/2",
+                self._alternating_update_msg() if self.alternating else self.iteration,
             )
-
-        if updating_player is None and not self._simultaneous_updates:
-            updating_player = self.iteration % 2
 
         value, tail_prob = self._traverse(
             deepcopy(self.root_state),
-            {player: 1.0 for player in [-1] + self.n_players},
-            updating_player,
+            reach_prob={player: 1.0 for player in [-1] + self.players},
+            updating_player=traversing_player,
             sample_probability=1.0,
-            weights={player: 0.0 for player in self.n_players}
+            weights={player: 0.0 for player in self.players}
             if self.weighting_mode == MCCFRWeightingMode.lazy
             else None,
         )
-        self.iteration += 1
+        self._iteration += 1
         return value
 
     def _traverse(
@@ -115,7 +67,6 @@ class OutcomeSamplingMCCFR:
         sample_probability=1.0,
         weights: Optional[dict[int, float]] = None,
     ):
-
         curr_player = state.current_player()
         if state.is_terminal():
             reward, sample_prob = (
@@ -125,27 +76,28 @@ class OutcomeSamplingMCCFR:
             return reward, sample_prob
 
         if state.is_chance_node():
-            chance_policy = {a: p for a, p in state.chance_outcomes()}
-
-            sampled_action = self.rng.choice(
-                list(chance_policy.keys()), p=list(chance_policy.values())
+            chance_policy = state.chance_outcomes()
+            sampled_action, action_index, sample_policy = sample_on_policy(
+                values=[outcome for outcome, prob in chance_policy],
+                policy=[prob for outcome, prob in chance_policy],
+                rng=self.rng,
             )
-            reach_prob[curr_player] *= chance_policy[sampled_action]
+            sample_prob = sample_policy[action_index]
+            reach_prob[curr_player] *= sample_prob
             state.apply_action(int(sampled_action))
-
             return self._traverse(
                 state,
                 reach_prob,
                 updating_player,
-                sample_probability * chance_policy[sampled_action],
+                sample_probability * sample_prob,
                 weights=weights,
             )
 
-        infostate = self._get_information_state(curr_player, state)
-        player_policy = self._get_current_policy(curr_player, infostate)
-        regret_table = self._get_regret_table(curr_player, infostate)
-
-        regret_matching(player_policy, regret_table)
+        curr_player = state.current_player()
+        infostate = state.information_state_string(curr_player)
+        self._set_action_list(infostate, state)
+        regret_minimizer = self.regret_minimizer(infostate)
+        player_policy = regret_minimizer.recommend(self.iteration)
 
         (
             sampled_action,
@@ -159,7 +111,7 @@ class OutcomeSamplingMCCFR:
         if self.weighting_mode == MCCFRWeightingMode.lazy:
             next_weights[curr_player] = (
                 next_weights[curr_player] * sampled_action_prob
-                + self._get_weight_storage(infostate)[sampled_action]
+                + self._weight(infostate)[sampled_action]
             )
 
         state.apply_action(sampled_action)
@@ -170,31 +122,8 @@ class OutcomeSamplingMCCFR:
             sample_probability * sampled_action_sample_prob,
             weights=next_weights,
         )
-        if self._simultaneous_updates or updating_player == curr_player:
-            cf_value_weight = action_value[curr_player] * counterfactual_reach_prob(
-                reach_prob, curr_player
-            )
-            for action in player_policy.keys():
-                is_sampled_action = action == sampled_action
-                regret_table[action] += (
-                    cf_value_weight
-                    * tail_prob
-                    * (
-                        is_sampled_action * (1.0 - player_policy[sampled_action])
-                        - (not is_sampled_action) * player_policy[sampled_action]
-                    )
-                )
-            if self._simultaneous_updates:
-                self._update_average_policy(
-                    curr_player,
-                    infostate,
-                    player_policy,
-                    sampled_action,
-                    reach_prob,
-                    sample_probability,
-                    weights,
-                )
-        else:
+
+        def avg_policy_update_call():
             self._update_average_policy(
                 curr_player,
                 infostate,
@@ -204,6 +133,28 @@ class OutcomeSamplingMCCFR:
                 sample_probability,
                 weights,
             )
+
+        if self.simultaneous or updating_player == curr_player:
+            cf_value_weight = action_value[curr_player] * counterfactual_reach_prob(
+                reach_prob, curr_player
+            )
+            regret_minimizer.observe_regret(
+                self.iteration,
+                lambda action: (
+                    cf_value_weight
+                    * tail_prob
+                    * (
+                        (action == sampled_action)
+                        * (1.0 - player_policy[sampled_action])
+                        - (not (action == sampled_action))
+                        * player_policy[sampled_action]
+                    )
+                ),
+            )
+            if self.simultaneous:
+                avg_policy_update_call()
+        else:
+            avg_policy_update_call()
         return action_value, tail_prob * sampled_action_prob
 
     def _update_average_policy(
@@ -216,7 +167,7 @@ class OutcomeSamplingMCCFR:
         sample_probability,
         weights,
     ):
-        avg_policy = self._get_average_policy(curr_player, infostate)
+        avg_policy = self._avg_policy_at(curr_player, infostate)
         if self.weighting_mode == MCCFRWeightingMode.optimistic:
             last_visit_difference = self.iteration + 1 - self.last_visit[infostate]
             self.last_visit[infostate] = self.iteration
@@ -240,19 +191,17 @@ class OutcomeSamplingMCCFR:
                     action != sampled_action
                 )
 
-    def _sample_action(self, current_player, updating_player, policy):
-        n_choices = len(policy)
-        uniform_prob = 1.0 / n_choices
-        sample_policy = {}
-        normal_policy = {}
-        choices = []
-
-        epsilon = self.epsilon if current_player == updating_player else 0.0
-
-        for action, policy_prob in policy.items():
-            choices.append(action)
-            sample_policy[action] = epsilon * uniform_prob + (1 - epsilon) * policy_prob
-            normal_policy[action] = policy_prob
-
-        sampled_action = self.rng.choice(choices, p=list(sample_policy.values()))
-        return sampled_action, policy[sampled_action], sample_policy[sampled_action]
+    def _sample_action(
+        self,
+        current_player: int,
+        updating_player: int,
+        policy: Dict[Action, Probability],
+    ):
+        actions = list(policy.keys())
+        sampled_action, sample_index, sample_policy = sample_on_policy(
+            actions,
+            [policy[action] for action in actions],
+            self.rng,
+            epsilon=self.epsilon * (current_player == updating_player),
+        )
+        return sampled_action, policy[sampled_action], sample_policy[sample_index]
