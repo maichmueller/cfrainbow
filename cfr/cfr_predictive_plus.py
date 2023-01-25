@@ -2,7 +2,7 @@ from collections.abc import MutableMapping
 from enum import Enum
 from typing import List, Dict, Sequence
 
-from cfr_discounted import DiscountedCFR2
+from .cfr_discounted import DiscountedCFR
 from type_aliases import Infostate, Value, Action
 
 
@@ -12,7 +12,7 @@ class Players(Enum):
     player2 = 1
 
 
-class PredictivePlusCFR(DiscountedCFR2):
+class PredictivePlusCFR(DiscountedCFR):
     def __init__(
         self,
         *args,

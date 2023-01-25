@@ -1,10 +1,8 @@
 import os
-from copy import deepcopy
 from typing import Dict, List, Optional
 import pickle
 import matplotlib.cm
 import numpy as np
-import pyspiel
 import torch
 from matplotlib import pyplot as plt
 from matplotlib.collections import LineCollection
@@ -13,25 +11,10 @@ from tqdm import tqdm
 
 from collections import Counter, defaultdict
 from multiprocessing import Pool, cpu_count
-from open_spiel.python.algorithms import exploitability
 
 from main import main_nash
-from utils import (
-    all_states_gen,
-    to_pyspiel_tab_policy,
-    print_final_policy_profile,
-    print_kuhn_poker_policy_profile,
-)
 
-from cfr_vanilla import CFR
-from cfr_linear import LinearCFR
-from cfr_plus import CFRPlus
-from cfr_discounted import DiscountedCFR
-from cfr_exp import ExponentialCFR
-from cfr_pure import PureCFR
-from cfr_monte_carlo_chance_sampling import ChanceSamplingCFR
-from cfr_monte_carlo_external_sampling import ExternalSamplingMCCFR
-from cfr_monte_carlo_outcome_sampling import OutcomeSamplingMCCFR
+from cfr import *
 
 
 def plot_cfr_convergence(
@@ -262,7 +245,7 @@ if __name__ == "__main__":
             jobs = list(
                 {
                     "CFR (A)": (
-                        CFR,
+                        CFRVanilla,
                         n_iters,
                         {
                             "game_name": game,
@@ -271,7 +254,7 @@ if __name__ == "__main__":
                         },
                     ),
                     "CFR (S)": (
-                        CFR,
+                        CFRVanilla,
                         n_iters,
                         {
                             "game_name": game,

@@ -1,20 +1,10 @@
-from copy import deepcopy
 import pyspiel
 from open_spiel.python.algorithms import exploitability
 from tqdm import tqdm
 
 import rm
-from cfr_vanilla import CFR
-from cfr_discounted import DiscountedCFR
-from cfr_exp import ExponentialCFR
-from cfr_linear import LinearCFR
-from cfr_monte_carlo_external_sampling import ExternalSamplingMCCFR
-from cfr_monte_carlo_outcome_sampling import OutcomeSamplingMCCFR, MCCFRWeightingMode
-from cfr_plus import CFRPlus
-from cfr_monte_carlo_chance_sampling import ChanceSamplingCFR
+import cfr
 
-from cfr_pure import PureCFR
-from cfr_sampling import SamplingCFR
 from utils import (
     all_states_gen,
     print_final_policy_profile,
@@ -260,13 +250,13 @@ if __name__ == "__main__":
     n_iters = 10000
     for minimizer in (rm.RegretMatcher,):
         main_nash(
-            OutcomeSamplingMCCFR,
+            cfr.SamplingCFR,
             n_iters,
             regret_minimizer=minimizer,
             alternating=True,
             do_print=True,
             tqdm_print=False,
             only_final_expl_print=False,
-            weighting_mode=MCCFRWeightingMode.optimistic,
+            weighting_mode=cfr.OutcomeSamplingWeightingMode.optimistic,
             seed=0,
         )

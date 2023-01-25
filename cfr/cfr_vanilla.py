@@ -1,25 +1,17 @@
-from collections import defaultdict, deque
 from copy import deepcopy
-from typing import Dict, Mapping, Optional, Type, Sequence, MutableMapping
+from typing import Dict, Mapping, Optional, Sequence
 
-from cfr_base import CFRBase
+from .cfr_base import CFRBase
 from type_aliases import Action, Infostate, Probability, Value
 import numpy as np
 
-import rm
 from rm import ExternalRegretMinimizer
 import pyspiel
 
-from utils import (
-    counterfactual_reach_prob,
-    print_final_policy_profile,
-    print_kuhn_poker_policy_profile,
-    to_pyspiel_tab_policy,
-    normalize_policy_profile,
-)
+from utils import counterfactual_reach_prob
 
 
-class CFR(CFRBase):
+class CFRVanilla(CFRBase):
     def iterate(
         self,
         traversing_player: Optional[int] = None,
@@ -82,9 +74,7 @@ class CFR(CFRBase):
             child_reach_prob = deepcopy(reach_prob)
             child_reach_prob[state.current_player()] *= outcome_prob
 
-            action_value = self._traverse(
-                next_state, child_reach_prob, updating_player
-            )
+            action_value = self._traverse(next_state, child_reach_prob, updating_player)
             state_value += outcome_prob * np.asarray(action_value)
         return state_value
 

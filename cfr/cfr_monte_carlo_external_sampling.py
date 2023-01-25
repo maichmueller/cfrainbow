@@ -2,10 +2,9 @@ from copy import deepcopy
 
 from typing import Optional
 
-import numpy as np
 import pyspiel
 
-from cfr_base import StochasticCFRBase
+from .cfr_base import StochasticCFRBase
 from utils import sample_on_policy
 
 

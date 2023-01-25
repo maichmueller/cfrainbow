@@ -6,7 +6,7 @@ import numpy as np
 
 import pyspiel
 
-from cfr_base import StochasticCFRBase
+from .cfr_base import StochasticCFRBase
 from type_aliases import Probability, Action
 from utils import (
     counterfactual_reach_prob,
@@ -14,7 +14,7 @@ from utils import (
 )
 
 
-class MCCFRWeightingMode(Enum):
+class OutcomeSamplingWeightingMode(Enum):
     lazy = 0
     optimistic = 1
     stochastic = 2
@@ -22,10 +22,14 @@ class MCCFRWeightingMode(Enum):
 
 class OutcomeSamplingMCCFR(StochasticCFRBase):
     def __init__(
-        self, *args, weighting_mode: MCCFRWeightingMode, epsilon: float = 0.6, **kwargs
+        self,
+        *args,
+        weighting_mode: OutcomeSamplingWeightingMode,
+        epsilon: float = 0.6,
+        **kwargs
     ):
         super().__init__(*args, **kwargs)
-        self.weighting_mode = MCCFRWeightingMode(weighting_mode)
+        self.weighting_mode = OutcomeSamplingWeightingMode(weighting_mode)
         self.weight_storage: Dict[str, Dict[int, float]] = dict()
         self.epsilon = epsilon
         self.last_visit: defaultdict[str, int] = defaultdict(int)
@@ -53,7 +57,7 @@ class OutcomeSamplingMCCFR(StochasticCFRBase):
             updating_player=traversing_player,
             sample_probability=1.0,
             weights={player: 0.0 for player in self.players}
-            if self.weighting_mode == MCCFRWeightingMode.lazy
+            if self.weighting_mode == OutcomeSamplingWeightingMode.lazy
             else None,
         )
         self._iteration += 1
@@ -108,7 +112,7 @@ class OutcomeSamplingMCCFR(StochasticCFRBase):
         child_reach_prob = deepcopy(reach_prob)
         child_reach_prob[curr_player] *= sampled_action_prob
         next_weights = deepcopy(weights)
-        if self.weighting_mode == MCCFRWeightingMode.lazy:
+        if self.weighting_mode == OutcomeSamplingWeightingMode.lazy:
             next_weights[curr_player] = (
                 next_weights[curr_player] * sampled_action_prob
                 + self._weight(infostate)[sampled_action]
@@ -168,14 +172,14 @@ class OutcomeSamplingMCCFR(StochasticCFRBase):
         weights,
     ):
         avg_policy = self._avg_policy_at(curr_player, infostate)
-        if self.weighting_mode == MCCFRWeightingMode.optimistic:
+        if self.weighting_mode == OutcomeSamplingWeightingMode.optimistic:
             last_visit_difference = self.iteration + 1 - self.last_visit[infostate]
             self.last_visit[infostate] = self.iteration
             for action, policy_prob in player_policy.items():
                 avg_policy[action] += (
                     reach_prob[curr_player] * policy_prob * last_visit_difference
                 )
-        elif self.weighting_mode == MCCFRWeightingMode.stochastic:
+        elif self.weighting_mode == OutcomeSamplingWeightingMode.stochastic:
             for action, policy_prob in player_policy.items():
                 avg_policy[action] += (
                     reach_prob[curr_player] * policy_prob / sample_probability

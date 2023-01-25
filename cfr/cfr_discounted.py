@@ -1,13 +1,12 @@
-from typing import Dict, Mapping, Type
+from typing import Type
 
 import pyspiel
 
 import rm
-from cfr_vanilla import CFR
-from type_aliases import Action, Infostate, Probability, Regret, Value
+from .cfr_vanilla import CFRVanilla
 
 
-class DiscountedCFR(CFR):
+class DiscountedCFR(CFRVanilla):
     def __init__(
         self,
         root_state: pyspiel.State,

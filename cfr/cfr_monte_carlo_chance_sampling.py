@@ -2,10 +2,10 @@ from typing import Optional, Union
 
 import numpy as np
 
-from cfr_vanilla import CFR
+from .cfr_vanilla import CFRVanilla
 
 
-class ChanceSamplingCFR(CFR):
+class ChanceSamplingCFR(CFRVanilla):
     def __init__(
         self, *args, seed: Optional[Union[int, np.random.Generator]] = None, **kwargs
     ):

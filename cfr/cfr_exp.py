@@ -5,8 +5,7 @@ from typing import Dict, Mapping, Optional, Sequence
 
 import numpy as np
 
-from cfr_base import CFRBase
-from rm import regret_matching
+from .cfr_base import CFRBase
 import pyspiel
 
 from utils import counterfactual_reach_prob

@@ -1,7 +1,7 @@
 import itertools
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Sequence, Dict, Tuple, Set, List, NamedTuple
+from typing import Sequence, Dict, Tuple, Set, List, NamedTuple, Union
 
 import numpy as np
 import pyspiel
@@ -212,10 +212,18 @@ def reduced_normal_form_strategy_space(
     return spaces
 
 
-def normal_form_expected_payoff(game: pyspiel.Game, *joint_plan: NormalFormPlan):
-    joint_plan_dict = {
-        infostate: action for infostate, action in itertools.chain(*joint_plan)
-    }
+def normal_form_expected_payoff(
+    game: pyspiel.Game,
+    joint_plan: Union[List[NormalFormPlan], Dict[Infostate, Action], NormalFormPlan],
+):
+    if isinstance(joint_plan, List):
+        joint_plan = {
+            infostate: action for infostate, action in itertools.chain(*joint_plan)
+        }
+    elif isinstance(joint_plan, NormalFormPlan):
+        joint_plan = {
+            infostate: action for infostate, action in joint_plan
+        }
     root = game.new_initial_state()
     stack = [(root, 1.0)]
     expected_payoff = np.zeros(root.num_players())
@@ -228,12 +236,12 @@ def normal_form_expected_payoff(game: pyspiel.Game, *joint_plan: NormalFormPlan)
             expected_payoff += chance * np.asarray(s.returns())
         else:
             infostate = s.information_state_string(s.current_player())
-            if infostate not in joint_plan_dict:
+            if infostate not in joint_plan:
                 # the infostate not being part of the plan means this is a reduced plan and the current point is
                 # unreachable by the player due to previous decisions. The expected outcome of this is hence simply 0,
                 # since it is never reached.
                 continue
-            s.apply_action(joint_plan_dict[infostate])
+            s.apply_action(joint_plan[infostate])
             stack.append((s, chance))
     return expected_payoff
 

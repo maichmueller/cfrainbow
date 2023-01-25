@@ -3,10 +3,8 @@ from typing import Dict, Mapping, Type
 import pyspiel
 
 import rm
-from cfr_vanilla import CFR
-from type_aliases import Action, Infostate, Probability, Regret, Value
 
-from cfr_discounted import DiscountedCFR
+from .cfr_discounted import DiscountedCFR
 
 
 class CFRPlus(DiscountedCFR):
