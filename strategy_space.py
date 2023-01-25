@@ -1,6 +1,7 @@
 import itertools
 import operator
 from collections import namedtuple, defaultdict
+from dataclasses import dataclass
 from functools import reduce
 from typing import Sequence, Dict, Tuple, Set, List
 
@@ -17,11 +18,28 @@ from type_aliases import (
 from utils import all_states_gen
 
 
-_informed_sequence = namedtuple("_informed_sequence", "infostate action depth")
+@dataclass
+class DepthInformedSequence:
+    infostate: Infostate
+    action: Action
+    depth: int
 
 
-def _informed_seq_filter(x: _informed_sequence):
-    return x.depth * 1e8 + sum(ord(c) for c in x.infostate)
+@dataclass
+class SequenceAttr:
+    action_seq: Tuple[Action]
+    succ_infostates: Set[Infostate]
+
+
+def depth_informed_seq_filter(x: DepthInformedSequence):
+    # sort by depth first, then by the infostate str comparison
+    # return x.depth, x.infostate
+    # sort by length of infostate first, then by the alphabetical order of the infostate str
+    return len(x.infostate), x.infostate
+
+
+def infostate_filter(istate: Infostate):
+    return len(istate), istate
 
 
 class InformedActionList:
@@ -32,7 +50,7 @@ class InformedActionList:
 
     def __iter__(self):
         return iter(
-            _informed_sequence(self.infostate, action, self.depth)
+            DepthInformedSequence(self.infostate, action, self.depth)
             for action in self.actions
         )
 
@@ -67,7 +85,7 @@ def normal_form_strategy_space(
             for plan in itertools.product(
                 *sorted(
                     action_space,
-                    key=_informed_seq_filter,
+                    key=depth_informed_seq_filter,
                 )
             )
         )
@@ -76,12 +94,10 @@ def normal_form_strategy_space(
 
 def sequence_space(
     game: pyspiel.Game, *players: int
-) -> Dict[int, Dict[Tuple[Infostate, Action], Tuple[Tuple[Action], Set[Infostate]]]]:
+) -> Dict[int, Dict[Tuple[Infostate, Action], SequenceAttr]]:
     if not players:
         players = list(range(game.num_players()))
-    spaces: Dict[
-        int, Dict[Tuple[Infostate, Action], Tuple[Tuple[Action], Set[Infostate]]]
-    ] = {}
+    spaces: Dict[int, Dict[Tuple[Infostate, Action], SequenceAttr]] = {}
 
     for player in players:
         sequences: Dict[Tuple[Infostate, Action], Tuple[Action]] = dict()
@@ -126,7 +142,7 @@ def sequence_space(
                     for i, action in enumerate(actions):
                         plan_copy = plan.copy()
                         plan_copy.append(
-                            _informed_sequence(infostate, action, depth + 1)
+                            DepthInformedSequence(infostate, action, depth + 1)
                         )
                         stack[actual_stack_length + i] = (
                             state.child(action),
@@ -134,7 +150,7 @@ def sequence_space(
                             depth + 1,
                         )
         spaces[player] = {
-            seq: (action_list, sequence_succ_set[seq])
+            seq: SequenceAttr(action_list, sequence_succ_set[seq])
             for seq, action_list in sequences.items()
         }
     return spaces
@@ -148,15 +164,26 @@ def reduced_normal_form_strategy_space(
     spaces = {}
     sequences_per_player = sequence_space(game, *players)
     for player, sequences in sequences_per_player.items():
-        # root sequences are those for which the action list leading up the infostate I and including the action to
-        # take at I are exactly 1 (only the action to take at I)
-        root_sequences = list(filter(lambda x: len(x[1][0]) == 1, sequences.items()))
+        # the action list are all of that player's actions leading up the infostate I and including the action to
+        # take at I.
+        # root sequences are those for which the action sequence is only the action to take at I, hence length 1
+        root_infostates = set(
+            infostate
+            for (infostate, _), _ in filter(
+                lambda x: len(x[1].action_seq) == 1, sequences.items()
+            )
+        )
+        # we reverse engineer the lega action set of each infostate from all sequences in the sequence space.
+        # This could, arguably, be done more efficiently by storing the legal action set during the sequence generation
         available_actions = defaultdict(list)
         for (infostate, action), action_list in sequences.items():
             available_actions[infostate].append(action)
 
-        root_infostates = set(infostate for (infostate, _), _ in root_sequences)
-
+        # infostate_sequences will hold all the possible sequences of
+        #   (infostate, action) -> (successor_infostate, successor_action)
+        # from each root infostate to the last infostate at which to act for this player.
+        # The dictionary will list all combinations of each action at an infostate and each
+        # possible immediate successor infostate following this action.
         infostate_sequences = {s: [] for s in root_infostates}
         for root_infostate, seq_list in infostate_sequences.items():
             stack = [(root_infostate, [], 0)]
@@ -164,31 +191,27 @@ def reduced_normal_form_strategy_space(
                 infostate, seq, depth = stack.pop()
                 for action in available_actions[infostate]:
                     seq_copy = seq.copy()
-                    seq_copy.append(_informed_sequence(infostate, action, depth))
+                    seq_copy.append(DepthInformedSequence(infostate, action, depth))
 
-                    if succ_infostates := sequences[(infostate, action)][1]:
+                    if succ_istates := sequences[(infostate, action)].succ_infostates:
                         stack.extend(
                             [
                                 (succ_infostate, seq_copy, depth + 1)
-                                for succ_infostate in succ_infostates
+                                for succ_infostate in succ_istates
                             ]
                         )
                     else:
                         seq_list.append(seq_copy)
 
-        final_plans = [None] * reduce(
-            operator.mul, (len(seq) for seq in infostate_sequences.values())
-        )
-        for i, seq_lists_combo in enumerate(
-            itertools.product(*infostate_sequences.values())
-        ):
-            final_plans[i] = tuple(
+        spaces[player] = set(
+            tuple(
                 (infostate, action)
                 for infostate, action, _ in sorted(
-                    itertools.chain(*seq_lists_combo), key=_informed_seq_filter
+                    itertools.chain(*seq_lists_combo), key=depth_informed_seq_filter
                 )
             )
-        spaces[player] = set(final_plans)
+            for seq_lists_combo in itertools.product(*infostate_sequences.values())
+        )
     return spaces
 
 
