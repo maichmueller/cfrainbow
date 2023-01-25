@@ -56,7 +56,9 @@ def predictive_regret_matching(
     regret_map: Mapping[Action, float],
     positivized_regret_map: Optional[MutableMapping[Action, float]] = None,
 ):
-    pos_regret_dict = dict()
+    pos_regret_dict = (
+        positivized_regret_map if positivized_regret_map is not None else dict()
+    )
     pos_regret_sum = 0.0
     avg_prediction = sum(
         [prediction[action] * action_prob for action, action_prob in policy.items()]

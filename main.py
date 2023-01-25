@@ -4,7 +4,7 @@ from open_spiel.python.algorithms import exploitability
 from tqdm import tqdm
 
 import rm
-from cfr import CFR
+from cfr_vanilla import CFR
 from cfr_discounted import DiscountedCFR
 from cfr_exp import ExponentialCFR
 from cfr_linear import LinearCFR
@@ -258,8 +258,6 @@ def main_cce(
 
 if __name__ == "__main__":
     n_iters = 10000
-    # main(n_iters, ExponentialCFR, simultaneous_updates=True, do_print=True, seed=0)
-    print("")
     for minimizer in (rm.RegretMatcher,):
         main_nash(
             OutcomeSamplingMCCFR,

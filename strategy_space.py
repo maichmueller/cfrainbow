@@ -1,8 +1,6 @@
 import itertools
-import operator
-from collections import namedtuple, defaultdict
+from collections import defaultdict
 from dataclasses import dataclass
-from functools import reduce
 from typing import Sequence, Dict, Tuple, Set, List, NamedTuple
 
 import numpy as np

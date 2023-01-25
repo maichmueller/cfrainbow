@@ -23,7 +23,7 @@ from utils import (
     print_kuhn_poker_policy_profile,
 )
 
-from cfr import CFR
+from cfr_vanilla import CFR
 from cfr_linear import LinearCFR
 from cfr_plus import CFRPlus
 from cfr_discounted import DiscountedCFR

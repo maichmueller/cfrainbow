@@ -176,9 +176,9 @@ class ExponentialCFR(CFRBase):
                 exp_l1_weights = dict()
                 for action, regret_incr in regret_incrs.items():
                     exp_l1 = np.exp(regret_incr - avg_regret)
-                    policy_weight = exp_l1 * reach_prob
                     exp_l1_weights[action] = exp_l1
 
+                    policy_weight = exp_l1 * reach_prob
                     policy_numerator[action] += policy_weight * player_policy[action]
                     policy_denominator[action] += policy_weight
 

@@ -3,7 +3,7 @@ from typing import Dict, Mapping, Type
 import pyspiel
 
 import rm
-from cfr import CFR
+from cfr_vanilla import CFR
 from type_aliases import Action, Infostate, Probability, Regret, Value
 
 

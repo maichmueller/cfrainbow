@@ -2,7 +2,7 @@ from typing import Optional, Union
 
 import numpy as np
 
-from cfr import CFR
+from cfr_vanilla import CFR
 
 
 class ChanceSamplingCFR(CFR):
