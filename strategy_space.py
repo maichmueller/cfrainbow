@@ -3,7 +3,7 @@ import operator
 from collections import namedtuple, defaultdict
 from dataclasses import dataclass
 from functools import reduce
-from typing import Sequence, Dict, Tuple, Set, List
+from typing import Sequence, Dict, Tuple, Set, List, NamedTuple
 
 import numpy as np
 import pyspiel
@@ -18,8 +18,7 @@ from type_aliases import (
 from utils import all_states_gen
 
 
-@dataclass
-class DepthInformedSequence:
+class DepthInformedSequence(NamedTuple):
     infostate: Infostate
     action: Action
     depth: int
