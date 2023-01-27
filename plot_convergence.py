@@ -12,7 +12,7 @@ from tqdm import tqdm
 from collections import Counter, defaultdict
 from multiprocessing import Pool, cpu_count
 
-from main import main_nash
+from main import main
 
 from cfr import *
 
@@ -228,7 +228,7 @@ def running_mean(values, window_size: int = 10):
 
 def main_wrapper(args):
     name, pos_args, kwargs = args
-    return name, main_nash(*pos_args, **kwargs)
+    return name, main(*pos_args, **kwargs)
 
 
 if __name__ == "__main__":
