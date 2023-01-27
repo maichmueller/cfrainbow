@@ -11,7 +11,6 @@ from type_aliases import (
     Action,
     NormalFormPlan,
     NormalFormStrategySpace,
-    SequenceFormPlan,
 )
 from utils import all_states_gen
 
@@ -77,7 +76,7 @@ def normal_form_strategy_space(
         strategy_spaces[player] = set(
             tuple(
                 (sorted_plan.infostate, sorted_plan.action)
-                for sorted_plan in sorted(plan, key=lambda x: x.depth)
+                for sorted_plan in sorted(plan, key=depth_informed_seq_filter)
             )
             for plan in itertools.product(
                 *sorted(
@@ -147,8 +146,8 @@ def sequence_space(
                             depth + 1,
                         )
         spaces[player] = {
-            seq: SequenceAttr(action_list, sequence_succ_set[seq])
-            for seq, action_list in sequences.items()
+            seq: SequenceAttr(root_to_infostate_action_list, sequence_succ_set[seq])
+            for seq, root_to_infostate_action_list in sequences.items()
         }
     return spaces
 
@@ -216,14 +215,12 @@ def normal_form_expected_payoff(
     game: pyspiel.Game,
     joint_plan: Union[List[NormalFormPlan], Dict[Infostate, Action], NormalFormPlan],
 ):
-    if isinstance(joint_plan, List):
+    if isinstance(joint_plan, list):
         joint_plan = {
             infostate: action for infostate, action in itertools.chain(*joint_plan)
         }
-    elif isinstance(joint_plan, NormalFormPlan):
-        joint_plan = {
-            infostate: action for infostate, action in joint_plan
-        }
+    elif isinstance(joint_plan, tuple):
+        joint_plan = {infostate: action for infostate, action in joint_plan}
     root = game.new_initial_state()
     stack = [(root, 1.0)]
     expected_payoff = np.zeros(root.num_players())
@@ -251,5 +248,11 @@ def normal_form_expected_payoff_table(
 ):
     payoffs: Dict[Tuple[NormalFormPlan], Sequence[float]] = dict()
     for joint_profile in itertools.product(*strategy_spaces):
-        payoffs[joint_profile] = normal_form_expected_payoff(game, *joint_profile)
+        payoffs[joint_profile] = normal_form_expected_payoff(
+            game,
+            {
+                infostate: action
+                for infostate, action in itertools.chain(*joint_profile)
+            },
+        )
     return payoffs

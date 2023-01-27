@@ -17,7 +17,7 @@ class CFRPlus(DiscountedCFR):
     ):
         kwargs.update(
             dict(
-                simultaneous_updates=False,
+                alternating=True,
                 alpha=float("inf"),
                 beta=-float("inf"),
                 gamma=1.,

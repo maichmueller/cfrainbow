@@ -44,7 +44,7 @@ class CFRVanilla(CFRBase):
         else:
             curr_player = state.current_player()
             infostate = state.information_state_string(curr_player)
-
+            self._set_action_list(infostate, state)
             action_values = self._action_value_map(infostate)
             state_value = self._traverse_player_node(
                 state, infostate, reach_prob_map, traversing_player, action_values
@@ -84,9 +84,12 @@ class CFRVanilla(CFRBase):
         current_player = state.current_player()
         state_value = np.zeros(len(self.players))
 
-        self._set_action_list(infostate, state)
         regret_minimizer = self.regret_minimizer(infostate)
-        current_policy = regret_minimizer.recommend(self.iteration)
+        current_policy = regret_minimizer.recommend(
+            self.iteration,
+            # prediction is ignored for non-predicting regret minimizers
+            prediction=self.value_prediction(infostate, reach_prob, updating_player),
+        )
 
         for action, action_prob in current_policy.items():
             child_reach_prob = deepcopy(reach_prob)
@@ -126,3 +129,29 @@ class CFRVanilla(CFRBase):
         avg_policy = self._avg_policy_at(curr_player, infostate)
         for action, curr_policy_prob in curr_policy.items():
             avg_policy[action] += player_reach_prob * curr_policy_prob
+
+    def value_prediction(
+        self,
+        infostate: Optional[Infostate],
+        reach_prob: Optional[Mapping[int, float]],
+        traversing_player: Optional[int],
+        *args,
+        **kwargs
+    ):
+        """Method to override in predictive subclasses
+
+        Parameters
+        ----------
+        infostate: Optional[Infostate]
+            the infostate at which to predict future payoffs
+        reach_prob: Optional[Mapping[int, float]]
+            the reach probabilities for each player to this node
+        traversing_player: int
+            the player that currently traverses the tree
+
+        Returns
+        -------
+        None
+            the base vanilla cfr method is not predictive.
+        """
+        return None

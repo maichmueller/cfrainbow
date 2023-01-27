@@ -14,6 +14,16 @@ from numba import njit
 from type_aliases import *
 
 
+def normalize_or_uniformize_policy(policy, pos_regret_dict, pos_regret_sum):
+    if pos_regret_sum > 0.0:
+        for action, pos_regret in pos_regret_dict.items():
+            policy[action] = pos_regret / pos_regret_sum
+    else:
+        uniform_prob = 1 / len(policy)
+        for action in policy.keys():
+            policy[action] = uniform_prob
+
+
 def regret_matching(
     policy: MutableMapping[Action, Probability],
     regret_map: Mapping[Action, float],
@@ -27,13 +37,7 @@ def regret_matching(
         pos_action_regret = max(0.0, regret)
         pos_regret_dict[action] = pos_action_regret
         pos_regret_sum += pos_action_regret
-    if pos_regret_sum > 0.0:
-        for action, pos_regret in pos_regret_dict.items():
-            policy[action] = pos_regret / pos_regret_sum
-    else:
-        uniform_prob = 1 / len(policy)
-        for action in policy.keys():
-            policy[action] = uniform_prob
+    normalize_or_uniformize_policy(policy, pos_regret_dict, pos_regret_sum)
 
 
 def regret_matching_plus(
@@ -44,48 +48,41 @@ def regret_matching_plus(
 
 
 def predictive_regret_matching(
-    prediction,
+    prediction: Mapping[Action, float],
     policy: MutableMapping[Action, Probability],
     regret_map: Mapping[Action, float],
-    positivized_regret_map: Optional[MutableMapping[Action, float]] = None,
 ):
-    pos_regret_dict = (
-        positivized_regret_map if positivized_regret_map is not None else dict()
-    )
     pos_regret_sum = 0.0
-    avg_prediction = sum(
+    avg_prediction: float = sum(
         [prediction[action] * action_prob for action, action_prob in policy.items()]
     )
+    positivized_regret_map = dict()
     for action, regret in regret_map.items():
-        pos_action_regret = max(0, regret + (prediction[action] - avg_prediction))
-        pos_regret_dict[action] = pos_action_regret
-        pos_regret_sum += pos_action_regret
-    if pos_regret_sum > 0.0:
-        for action, pos_regret in pos_regret_dict.items():
-            policy[action] = pos_regret / pos_regret_sum
-    else:
-        uniform_prob = 1 / len(pos_regret_dict)
-        for action in policy.keys():
-            policy[action] = uniform_prob
+        pos_regret = max(0.0, regret + (prediction[action] - avg_prediction))
+        pos_regret_sum += pos_regret
+        positivized_regret_map[action] = pos_regret
+    normalize_or_uniformize_policy(policy, positivized_regret_map, pos_regret_sum)
 
 
-def predictive_regret_matching_plus(prediction, policy, regret_dict):
+def predictive_regret_matching_plus(
+    prediction: Mapping[Action, float],
+    policy: MutableMapping[Action, Probability],
+    regret_map: MutableMapping[Action, float],
+):
     pos_regret_sum = 0.0
     avg_prediction = sum(
         [prediction[action] * action_prob for action, action_prob in policy.items()]
     )
-    for action, regret in regret_dict.items():
-        pos_regret = max(0, regret)
-        regret_dict[action] = pos_regret
-        pos_action_regret = max(0, pos_regret + prediction[action] - avg_prediction)
-        pos_regret_sum += pos_action_regret
-    if pos_regret_sum > 0.0:
-        for action, pos_regret in regret_dict.items():
-            policy[action] = pos_regret / pos_regret_sum
-    else:
-        uniform_prob = 1 / len(regret_dict)
-        for action in policy.keys():
-            policy[action] = uniform_prob
+    positivized_regret_map = dict()
+    for action, regret in regret_map.items():
+        pos_regret = max(0.0, regret)
+        pos_regret_sum += pos_regret
+        regret_map[action] = pos_regret
+        positivized_regret_map[action] = max(
+            0.0, pos_regret + prediction[action] - avg_prediction
+        )
+
+    normalize_or_uniformize_policy(policy, positivized_regret_map, pos_regret_sum)
 
 
 class ExternalRegretMinimizer(ABC):
@@ -109,7 +106,9 @@ class ExternalRegretMinimizer(ABC):
         self._recommendation_computed = False
 
     @abstractmethod
-    def recommend(self, iteration: Optional[int] = None) -> Dict[Action, Probability]:
+    def recommend(
+        self, iteration: Optional[int] = None, *args, **kwargs
+    ) -> Dict[Action, Probability]:
         raise NotImplementedError(
             f"method '{self.recommend.__name__}' is not implemented."
         )
@@ -143,13 +142,13 @@ class RegretMatcher(ExternalRegretMinimizer):
         super().reset()
         self._last_update_time = -1
 
-    def recommend(self, iteration: int = None, force: bool = False):
+    def recommend(self, iteration: int = None, force: bool = False, *args, **kwargs):
         if force or (
             not self._recommendation_computed
             and self._last_update_time
             < iteration  # 2nd condition checks if the update iteration has completed
         ):
-            self._ready_recommendation()
+            self._prepare_recommendation(*args, **kwargs)
         return self.recommendation
 
     def observe_regret(
@@ -160,7 +159,7 @@ class RegretMatcher(ExternalRegretMinimizer):
         self._last_update_time = iteration
         self._recommendation_computed = False
 
-    def _ready_recommendation(self):
+    def _prepare_recommendation(self, *args, **kwargs):
         regret_matching(self.recommendation, self.cumulative_regret)
         self._recommendation_computed = True
 
@@ -173,7 +172,7 @@ class RegretMatcher(ExternalRegretMinimizer):
 
 
 class RegretMatcherPlus(RegretMatcher):
-    def _ready_recommendation(self):
+    def _prepare_recommendation(self):
         regret_matching_plus(self.recommendation, self.cumulative_regret)
         self._recommendation_computed = True
 
@@ -204,13 +203,29 @@ class RegretMatcherDiscounted(RegretMatcher):
         for action, regret in self.cumulative_regret.items():
             self.cumulative_regret[action] = regret * (alpha if regret > 0 else beta)
 
-    def _ready_recommendation(self):
+    def _prepare_recommendation(self):
         self._apply_weights()
-        super()._ready_recommendation()
+        super()._prepare_recommendation()
 
 
 class RegretMatcherDiscountedPlus(RegretMatcherDiscounted):
-    def _ready_recommendation(self):
+    def _prepare_recommendation(self):
         self._apply_weights()
         regret_matching_plus(self.recommendation, self.cumulative_regret)
+        self._recommendation_computed = True
+
+
+class RegretMatcherPredictive(RegretMatcher):
+    def _prepare_recommendation(self, prediction, *args, **kwargs):
+        predictive_regret_matching(
+            prediction, self.recommendation, self.cumulative_regret
+        )
+        self._recommendation_computed = True
+
+
+class RegretMatcherPredictivePlus(RegretMatcher):
+    def _prepare_recommendation(self, prediction, *args, **kwargs):
+        predictive_regret_matching_plus(
+            prediction, self.recommendation, self.cumulative_regret
+        )
         self._recommendation_computed = True

@@ -4,5 +4,7 @@ from .external import (
     RegretMatcherPlus,
     RegretMatcherDiscounted,
     RegretMatcherDiscountedPlus,
+    RegretMatcherPredictive,
+    RegretMatcherPredictivePlus,
 )
 from .internal import InternalRegretMinimizer, InternalFromExternalRegretMinimizer

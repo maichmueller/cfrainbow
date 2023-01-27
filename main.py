@@ -248,9 +248,9 @@ def main_cce(
 
 if __name__ == "__main__":
     n_iters = 10000
-    for minimizer in (rm.RegretMatcher,):
+    for minimizer in (rm.RegretMatcherPredictivePlus,):
         main_nash(
-            cfr.SamplingCFR,
+            cfr.PredictivePlusCFR,
             n_iters,
             regret_minimizer=minimizer,
             alternating=True,

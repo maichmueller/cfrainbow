@@ -4,7 +4,7 @@ import itertools
 import warnings
 from enum import Enum
 from functools import reduce, singledispatchmethod
-from typing import Dict, List, Union, Any, Sequence, Optional, Tuple
+from typing import Dict, List, Union, Any, Sequence, Optional, Tuple, Mapping
 
 import numpy as np
 import pyspiel
@@ -22,7 +22,7 @@ class LeducAction(Enum):
     Raise = 2
 
 
-def counterfactual_reach_prob(reach_prob_map: dict[int, float], player: int):
+def counterfactual_reach_prob(reach_prob_map: Mapping[int, float], player: int):
     return reduce(
         lambda x, y: x * y,
         [rp for i, rp in reach_prob_map.items() if i != player],
