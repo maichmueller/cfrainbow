@@ -1,16 +1,30 @@
 import itertools
 from collections import defaultdict
+from copy import deepcopy
 from dataclasses import dataclass
-from typing import Sequence, Dict, Tuple, Set, List, NamedTuple, Union
-
+from typing import (
+    Sequence,
+    Dict,
+    Tuple,
+    Set,
+    List,
+    NamedTuple,
+    Union,
+    Mapping,
+    Optional,
+)
+from rich import print
 import numpy as np
 import pyspiel
+from tqdm import tqdm
 
 from type_aliases import (
     Infostate,
     Action,
     NormalFormPlan,
     NormalFormStrategySpace,
+    Probability,
+    Player,
 )
 from utils import all_states_gen
 
@@ -55,8 +69,8 @@ class InformedActionList:
 
 
 def normal_form_strategy_space(
-    game: pyspiel.Game, *players: int
-) -> Dict[int, Set[NormalFormPlan]]:
+    game: pyspiel.Game, *players: Player
+) -> Dict[Player, Set[NormalFormPlan]]:
     if not players:
         players: List[int] = list(range(game.num_players()))
     action_spaces = {p: [] for p in players}
@@ -89,11 +103,11 @@ def normal_form_strategy_space(
 
 
 def sequence_space(
-    game: pyspiel.Game, *players: int
-) -> Dict[int, Dict[Tuple[Infostate, Action], SequenceAttr]]:
+    game: pyspiel.Game, *players: Player
+) -> Dict[Player, Dict[Tuple[Infostate, Action], SequenceAttr]]:
     if not players:
         players = list(range(game.num_players()))
-    spaces: Dict[int, Dict[Tuple[Infostate, Action], SequenceAttr]] = {}
+    spaces: Dict[Player, Dict[Tuple[Infostate, Action], SequenceAttr]] = {}
 
     for player in players:
         sequences: Dict[Tuple[Infostate, Action], Tuple[Action]] = dict()
@@ -153,8 +167,8 @@ def sequence_space(
 
 
 def reduced_normal_form_strategy_space(
-    game: pyspiel.Game, *players: int
-) -> Dict[int, Set[NormalFormPlan]]:
+    game: pyspiel.Game, *players: Player
+) -> Dict[Player, Set[NormalFormPlan]]:
     if not players:
         players = list(range(game.num_players()))
     spaces = {}
@@ -169,7 +183,7 @@ def reduced_normal_form_strategy_space(
                 lambda x: len(x[1].action_seq) == 1, sequences.items()
             )
         )
-        # we reverse engineer the lega action set of each infostate from all sequences in the sequence space.
+        # we reverse engineer the legal action set of each infostate from all sequences in the sequence space.
         # This could, arguably, be done more efficiently by storing the legal action set during the sequence generation
         available_actions = defaultdict(list)
         for (infostate, action), action_list in sequences.items():
@@ -256,3 +270,121 @@ def normal_form_expected_payoff_table(
             },
         )
     return payoffs
+
+
+def reachable_terminal_states(
+    game: pyspiel.Game,
+    players: Optional[Sequence[Player]] = None,
+    plans: Optional[Mapping[Player, Set[NormalFormPlan]]] = None,
+    use_progressbar: bool = False,
+):
+    if players is None:
+        players = list(range(game.num_players()))
+    if plans is None:
+        plans = reduced_normal_form_strategy_space(game, *players)
+
+    reachable_labels_map: Dict[NormalFormPlan, List[str]] = dict()
+    for player in players:
+        for plan in (
+            tqdm(
+                plans[player],
+                desc=f"Finding reachable terminal states for player {player}",
+            )
+            if use_progressbar
+            else plans[player]
+        ):
+            reachable_labels_map.setdefault(plan, [])
+            # convert to dictionary for faster lookups
+            plan_dict = {infostate: action for infostate, action in plan}
+
+            stack = [game.new_initial_state()]
+            while stack:
+                s = stack.pop()
+                if s.is_chance_node():
+                    stack.extend([s.child(action) for action, _ in s.chance_outcomes()])
+                elif s.is_terminal():
+                    reachable_labels_map[plan].append(str(s))
+                else:
+                    if (curr_player := s.current_player()) == player:
+                        if (
+                            action := plan_dict.get(
+                                s.information_state_string(curr_player),
+                                None,  # substitute if missing
+                            )
+                        ) is not None:
+                            s.apply_action(action)
+                            stack.append(s)
+                    else:
+                        stack.extend([s.child(action) for action in s.legal_actions()])
+    return reachable_labels_map
+
+
+def behaviour_to_normal_form(
+    game: pyspiel.Game,
+    players: Sequence[Player],
+    behavior_strategies: Mapping[
+        Player,
+        Mapping[
+            Infostate, Union[Mapping[Action, Probability], Tuple[Action, Probability]]
+        ],
+    ],
+    *,
+    reachable_labels_map: Optional[Mapping[NormalFormPlan, List[str]]] = None,
+    plans: Optional[Mapping[Player, Set[NormalFormPlan]]] = None,
+):
+    if reachable_labels_map is None:
+        reachable_labels_map = reachable_terminal_states(game, players, plans)
+    if plans is None:
+        plans = reduced_normal_form_strategy_space(game, *players)
+
+    terminal_reach_prob = terminal_reach_probabilities(
+        game, players, behavior_strategies
+    )
+
+    plans_out = dict()
+    for player in players:
+        plan_out = []
+        while terminal_reach_prob:
+            argmax_plan, max_value = tuple(), -float("inf")
+            for plan in plans[player]:
+                minimal_prob = min(
+                    [terminal_reach_prob[z] for z in reachable_labels_map[plan]]
+                )
+                if minimal_prob > max_value:
+                    argmax_plan = plan
+                    max_value = minimal_prob
+            plan_out.append((argmax_plan, max_value))
+            for label in terminal_reach_prob[argmax_plan]:
+                terminal_reach_prob[label] -= max_value
+    return plans_out
+
+
+def terminal_reach_probabilities(
+    game: pyspiel.Game,
+    players: Sequence[Player],
+    behavior_strategies: Mapping[
+        Player, Mapping[Infostate, Mapping[Action, Probability]]
+    ],
+):
+    root = game.new_initial_state()
+    stack = [(root, {p: 1.0 for p in players})]
+    terminal_reach_prob = dict()
+    while stack:
+        state, reach_prob = stack.pop()
+        if state.is_chance_node():
+            for outcome, _ in state.chance_outcomes():
+                stack.append((state.child(outcome), reach_prob))
+        elif state.is_terminal():
+            terminal_reach_prob[state] = reach_prob
+        else:
+            if (curr_player := state.current_player()) in players:
+                infostate = state.information_state_string(curr_player)
+                policy = behavior_strategies[curr_player][infostate]
+                for action in state.legal_actions():
+                    child_reach_prob = deepcopy(reach_prob)
+                    child_reach_prob[curr_player] *= policy[action]
+                    stack.append((state.child(action), child_reach_prob))
+            else:
+                for action in state.legal_actions():
+                    stack.append((state.child(action), reach_prob))
+    return terminal_reach_prob

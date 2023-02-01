@@ -165,3 +165,90 @@ def ce_deviation_incentive(
                 )
         deviation_incentive = max(deviation_incentive, player_deviation)
     return deviation_incentive
+
+
+# def efop_cce_deviation_incentive_efg(
+#     empirical_frequency_of_play: NormalFormStrategy,
+#     strategy_spaces: Sequence[NormalFormStrategySpace],
+# ):
+#     r"""Computes the lowest coarse correlated equilibrium deviation incentive of a joint normal-form distribution.
+#
+#     Notes
+#     -----
+#     A coarse correlated equilibrium :math:`\mu` is a probability distribution over the joint normal-form strategy space
+#     of all players that fulfills the following criteria:
+#     Let :math:`S_i` be the strategy space of player :math:`i` and :math:`S_{-i}` be the strategy space of :math:`i`'s
+#     opponents :math:`S_1 \times \dots S_{i-1} \times S_{i+1} \times \dots \times S_n`, a probability distribution
+#     :math:`\mu` over the joint strategy space :math:`S_1 \times \dots \times S_n` is an :math:`\epsilon` - CCE for some
+#     :math:`\epsilon > 0` iff for each player :math:`i` and :math:`\forall z_i \in S_i` holds:
+#
+#     .. math::
+#             \sum_{s_i \in S_i} \sum_{s_{-i} \in S_{-i}} \mu(s_i, s_{-i}) (u(z_i, s_{-i}) - u(s_i, s_{-i})) \leq \epsilon
+#
+#
+#     Parameters
+#     ----------
+#     empirical_frequency_of_play: NormalFormStrategy
+#         the distribution whose distance to a CCE is to be evaluated.
+#     strategy_spaces: Sequence[NormalFormStrategySpace]
+#         the sequence of players' strategy spaces. Element i is the ith player's strategy space.
+#     payoff: Mapping[Tuple[NormalFormPlan], Sequence[float]]
+#         the map of normal-form plan profiles to the vector of player payoffs. Payoff index i is ith player's payoff.
+#
+#     Returns
+#     -------
+#     float
+#         the maximum deviation incentive for any player and any of their strategies.
+#     """
+#     strategy_spaces = list(strategy_spaces)
+#     deviation_incentive = -cmath.inf
+#
+#     infostates = defaultdict(set)
+#     for infostate, player, _, _ in infostates_gen(self.root_state.clone()):
+#         infostates[player].add(infostate)
+#
+#     # reduced_strat_space = reduced_normal_form_strategy_space(pyspiel.load_game("kuhn_poker"), self.players)
+#     # plan_by_player = [
+#     #     tuple(
+#     #         tuple(
+#     #             [
+#     #                 (infostate, action)
+#     #                 for infostate, action in entry[0]
+#     #                 if infostate in infostates[player]
+#     #             ]
+#     #         )
+#     #         for player in self.players
+#     #     )
+#     #     + (entry[1],)
+#     #     for entry in self.empirical_freq_of_play.items()
+#     # ]
+#     opp_marginals = {p: defaultdict(float) for p in self.players}
+#     # for player in self.players:
+#     #     player_marginals = opp_marginals[player]
+#     #     for entry in plan_by_player:
+#     #         prob, *player_plans = reversed(entry)
+#     #         player_marginals[
+#     #             tuple(
+#     #                 item
+#     #                 for item in itertools.chain(
+#     #                     player_plans[:player] + player_plans[player + 1 :]
+#     #                 )
+#     #             )
+#     #         ] += prob
+#     if self.iteration > self.nr_players:
+#         for plan, count in self.empirical_sum_of_play.items():
+#             player_plans = [[] for _ in range(self.nr_players)]
+#             for player in self.players:
+#                 for infostate, action in plan:
+#                     if infostate in infostates[player]:
+#                         player_plans[player].append((infostate, action))
+#             for player in self.players:
+#                 opp_marginals[player][
+#                     tuple(
+#                         item
+#                         for item in itertools.chain(
+#                             *(player_plans[:player] + player_plans[player + 1:])
+#                         )
+#                     )
+#                 ] += count / (self.iteration + 1)
+#     return deviation_incentive
