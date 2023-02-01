@@ -1,9 +1,8 @@
-from typing import Dict, Mapping, Type
+from typing import Type
 
 import pyspiel
 
 import rm
-
 from .cfr_discounted import DiscountedCFR
 
 
@@ -20,7 +19,7 @@ class CFRPlus(DiscountedCFR):
                 alternating=True,
                 alpha=float("inf"),
                 beta=-float("inf"),
-                gamma=1.,
+                gamma=1.0,
             )
         )
         super().__init__(

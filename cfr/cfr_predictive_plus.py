@@ -7,7 +7,7 @@ import numpy as np
 import pyspiel
 
 from .cfr_discounted import DiscountedCFR
-from type_aliases import Infostate, Value, Action
+from spiel_types import Infostate, Value, Action
 
 from utils import counterfactual_reach_prob
 
@@ -58,7 +58,7 @@ class PredictivePlusCFR(DiscountedCFR):
         reach_prob: Mapping[int, float],
         traversing_player: int,
         *args,
-        **kwargs
+        **kwargs,
     ):
         """Returns the current prediction of next iteration's payoff
 

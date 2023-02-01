@@ -1,13 +1,37 @@
-from collections import defaultdict, deque
+from __future__ import annotations
+import itertools
+from collections import defaultdict
 from copy import deepcopy
-from typing import Optional, Dict, Mapping
+from typing import Optional, Dict, Mapping, Sequence, Union
 
-from .cfr_pure import PureCFR
-import pyspiel
 import numpy as np
+import pyspiel
+from click import Tuple
 
+from spiel_types import Action, Infostate, Probability, NormalFormPlan
 from utils import sample_on_policy, counterfactual_reach_prob
-from type_aliases import Action, Infostate, Probability, NormalFormPlan
+from .cfr_base import iterate_log_print
+from .cfr_pure import PureCFR
+
+
+class JointNormalFormPlan:
+    def __init__(self, plans: Sequence[NormalFormPlan]):
+        self.plans: tuple[NormalFormPlan] = tuple(plans)
+        self.hash = hash(tuple(elem for elem in itertools.chain(self.plans)))
+
+    def __contains__(self, item):
+        return any(item in plan for plan in self.plans)
+
+    def __hash__(self):
+        return self.hash
+
+    def __eq__(self, other: Union[Sequence[NormalFormPlan], JointNormalFormPlan]):
+        if isinstance(other, JointNormalFormPlan):
+            return self.plans == other.plans
+        return all(other_plan == plan for other_plan, plan in zip(other, self.plans))
+
+    def __repr__(self):
+        return repr(self.plans)
 
 
 class SamplingCFR(PureCFR):
@@ -18,48 +42,46 @@ class SamplingCFR(PureCFR):
     ):
         kwargs["alternating"] = False
         super().__init__(*args, **kwargs)
-        self.plan: Dict[Infostate, Action] = dict()
+        # the storage for each player's sampled strategy during the iteration
+        self.plan: tuple[Dict[Infostate, Action], ...] = tuple(
+            dict() for _ in self.players
+        )
         # the storage of all played strategy profiles in the iterations.
-        # 'sum of play' since it is prior to division by 'T'.
-        self.empirical_sum_of_play: Dict[NormalFormPlan, int] = defaultdict(int)
+        # 'sum of play' since it is prior to division by the iteration count 'T'.
+        self.empirical_sum_of_play: Dict[JointNormalFormPlan, int] = defaultdict(int)
 
+    @iterate_log_print
     def iterate(
         self,
         traversing_player: Optional[int] = None,
     ):
-        traversing_player = self._cycle_updating_player(traversing_player)
-
-        if self._verbose:
-            print(
-                "\nIteration",
-                self._alternating_update_msg() if self.alternating else self.iteration,
-            )
-        root_reach_probabilities = (
-            {player: 1.0 for player in [-1] + self.players}
-            if self.simultaneous
-            else None
-        )
         # empty the previously sampled strategy profile
-        self.plan.clear()
+        for plan in self.plan:
+            plan.clear()
+
         self._traverse(
             self.root_state.clone(),
-            root_reach_probabilities,
-            traversing_player,
+            reach_prob={player: 1.0 for player in [-1] + self.players},
+            traversing_player=self._cycle_updating_player(traversing_player),
         )
-        self.empirical_sum_of_play[tuple(self.plan.items())] += 1
+        self.empirical_sum_of_play[
+            JointNormalFormPlan(
+                tuple(tuple(plan.items()) for plan in itertools.chain(self.plan))
+            )
+        ] += 1
         self._iteration += 1
 
     def _traverse(
         self,
         state: pyspiel.State,
         reach_prob: Optional[Dict[int, Probability]] = None,
-        updating_player: Optional[int] = None,
+        traversing_player: Optional[int] = None,
     ):
         if state.is_terminal():
             return state.returns()
 
         if state.is_chance_node():
-            return self._traverse_chance_node(state, reach_prob, updating_player)
+            return self._traverse_chance_node(state, reach_prob, traversing_player)
 
         curr_player = state.current_player()
         infostate = state.information_state_string(curr_player)
@@ -68,7 +90,9 @@ class SamplingCFR(PureCFR):
         regret_minimizer = self.regret_minimizer(infostate)
         player_policy = regret_minimizer.recommend(self.iteration)
 
-        sampled_action = self._sample_action(infostate, player_policy)
+        sampled_action = self._sample_action(
+            infostate, player_policy, sampling_player=curr_player
+        )
 
         # increment the average policy for the player
         self._avg_policy_at(curr_player, infostate)[sampled_action] += 1
@@ -81,7 +105,7 @@ class SamplingCFR(PureCFR):
             action_values[action] = self._traverse(
                 state.child(action),
                 child_reach_prob,
-                updating_player,
+                traversing_player,
             )
         state_value = action_values[sampled_action]
         player_state_value = state_value[curr_player]
@@ -96,7 +120,7 @@ class SamplingCFR(PureCFR):
         return state_value
 
     def _traverse_chance_node(self, state, reach_prob, updating_player):
-        state_value = np.zeros(self.nr_players)
+        state_value = [0.0] * self.nr_players
         outcomes_probs = state.chance_outcomes()
         sampled_outcome, _, _ = sample_on_policy(
             values=[outcome[0] for outcome in outcomes_probs],
@@ -112,24 +136,22 @@ class SamplingCFR(PureCFR):
             child_reach_prob[state.current_player()] *= is_sampled_outcome
 
             action_value = self._traverse(next_state, child_reach_prob, updating_player)
-            state_value += is_sampled_outcome * np.asarray(action_value)
+            for p in self.players:
+                state_value[p] += is_sampled_outcome * action_value[p]
         return state_value
 
-    def _avg_policy_at(self, current_player, infostate):
-        if infostate not in (player_policy := self._avg_policy[current_player]):
-            player_policy[infostate] = {
-                action: 0.0 for action in self.action_list(infostate)
-            }
-        return player_policy[infostate]
-
     def _sample_action(
-        self, infostate: Infostate, player_policy: Mapping[Action, Probability]
+        self,
+        infostate: Infostate,
+        player_policy: Mapping[Action, Probability],
+        *args,
+        **kwargs,
     ):
-        if infostate not in self.plan:
+        if infostate not in (plan := self.plan[kwargs["sampling_player"]]):
             actions = self.action_list(infostate)
-            self.plan[infostate], _, _ = sample_on_policy(
+            plan[infostate], _, _ = sample_on_policy(
                 values=actions,
                 policy=[player_policy[action] for action in actions],
                 rng=self.rng,
             )
-        return self.plan[infostate]
+        return plan[infostate]

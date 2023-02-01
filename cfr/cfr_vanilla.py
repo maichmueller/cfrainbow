@@ -1,9 +1,8 @@
 from copy import deepcopy
 from typing import Dict, Mapping, Optional, Sequence
 
-from .cfr_base import CFRBase
-from type_aliases import Action, Infostate, Probability, Value
-import numpy as np
+from .cfr_base import CFRBase, iterate_log_print
+from spiel_types import Action, Infostate, Probability, Value
 
 from rm import ExternalRegretMinimizer
 import pyspiel
@@ -12,21 +11,15 @@ from utils import counterfactual_reach_prob
 
 
 class CFRVanilla(CFRBase):
+    @iterate_log_print
     def iterate(
         self,
         traversing_player: Optional[int] = None,
     ):
-        traversing_player = self._cycle_updating_player(traversing_player)
-
-        if self._verbose:
-            print(
-                "\nIteration",
-                self._alternating_update_msg() if self.alternating else self.iteration,
-            )
         self._traverse(
             self.root_state.clone(),
             reach_prob_map={player: 1.0 for player in [-1] + self.players},
-            traversing_player=traversing_player,
+            traversing_player=self._cycle_updating_player(traversing_player),
         )
         self._iteration += 1
 
@@ -67,7 +60,7 @@ class CFRVanilla(CFRBase):
             return state_value
 
     def _traverse_chance_node(self, state, reach_prob, updating_player):
-        state_value = np.zeros(len(self.players))
+        state_value = [0.] * self.nr_players
         for outcome, outcome_prob in state.chance_outcomes():
             next_state = state.child(outcome)
 
@@ -75,14 +68,15 @@ class CFRVanilla(CFRBase):
             child_reach_prob[state.current_player()] *= outcome_prob
 
             action_value = self._traverse(next_state, child_reach_prob, updating_player)
-            state_value += outcome_prob * np.asarray(action_value)
+            for p in self.players:
+                state_value[p] += outcome_prob * action_value[p]
         return state_value
 
     def _traverse_player_node(
         self, state, infostate, reach_prob, updating_player, action_values
     ):
         current_player = state.current_player()
-        state_value = np.zeros(len(self.players))
+        state_value = [0.] * self.nr_players
 
         regret_minimizer = self.regret_minimizer(infostate)
         current_policy = regret_minimizer.recommend(
@@ -96,10 +90,12 @@ class CFRVanilla(CFRBase):
             child_reach_prob[current_player] *= action_prob
             next_state = state.child(action)
 
-            action_values[action] = self._traverse(
+            child_value = self._traverse(
                 next_state, child_reach_prob, updating_player
             )
-            state_value += action_prob * np.asarray(action_values[action])
+            action_values[action] = child_value
+            for p in self.players:
+                state_value[p] += action_prob * child_value[p]
 
         return state_value
 

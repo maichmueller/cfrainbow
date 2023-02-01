@@ -9,7 +9,7 @@ from typing import (
 
 import numpy as np
 
-from type_aliases import *
+from spiel_types import *
 from utils import slice_kwargs
 from .external import ExternalRegretMinimizer
 

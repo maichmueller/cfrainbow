@@ -4,11 +4,11 @@ import itertools
 import warnings
 from enum import Enum
 from functools import reduce, singledispatchmethod
-from typing import Dict, List, Union, Any, Sequence, Optional, Tuple, Mapping
+from typing import Dict, List, Union, Any, Sequence, Mapping, Optional
 
 import numpy as np
 import pyspiel
-from numba import njit, jit
+import numba
 
 
 class KuhnAction(Enum):

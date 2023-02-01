@@ -1,5 +1,4 @@
 import cmath
-
 from abc import ABC, abstractmethod
 from typing import (
     Dict,
@@ -11,7 +10,7 @@ from typing import (
 
 from numba import njit
 
-from type_aliases import *
+from spiel_types import *
 
 
 def normalize_or_uniformize_policy(policy, pos_regret_dict, pos_regret_sum):

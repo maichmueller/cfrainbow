@@ -1,3 +1,4 @@
+import operator
 import os
 from typing import Dict, List, Optional
 import pickle
@@ -45,10 +46,10 @@ def plot_cfr_convergence(
         ]
         unpaired_algo_list = sorted(
             [(algo, algorithm_to_expl_lists.pop(algo)) for algo in unpaired_algo_names],
-            key=lambda x: x[0],
+            key=operator.itemgetter(0),
         )
         algorithm_to_expl_lists = (
-            sorted(list(algorithm_to_expl_lists.items()), key=lambda x: x[0])
+            sorted(list(algorithm_to_expl_lists.items()), key=operator.itemgetter(0))
             + unpaired_algo_list
         )
         dash_pattern = matplotlib.rcParams["lines.dashed_pattern"]
@@ -66,7 +67,7 @@ def plot_cfr_convergence(
                 )
                 iter_beginnings = iters_run - iteration_counts
                 freq_arr = np.asarray(
-                    sorted(Counter(iter_beginnings).items(), key=lambda x: x[0]),
+                    sorted(Counter(iter_beginnings).items(), key=operator.itemgetter(0)),
                     dtype=float,
                 )
                 absolute_freq = np.cumsum(freq_arr, axis=0)[:, 1]
@@ -197,7 +198,6 @@ def plot_cfr_convergence(
                     linestyle=linestyle,
                     color=color,
                 )
-
 
         ax.set_xlabel("Iteration")
         ax.set_ylabel("Exploitability")

@@ -1,12 +1,26 @@
-from collections import defaultdict, deque
-from typing import Dict, Mapping, Optional, Type, Sequence, MutableMapping, Union
+import functools
+import inspect
+from collections import deque
+from typing import Dict, Optional, Type, Sequence, MutableMapping, Union
 
 import numpy as np
-
-from type_aliases import Action, Infostate, Probability, Value
-from rm import ExternalRegretMinimizer
 import pyspiel
-import inspect
+
+from rm import ExternalRegretMinimizer
+from spiel_types import Action, Infostate, Probability, Player
+
+
+@functools.wraps
+def iterate_log_print(f):
+    def wrapped(self, *args, **kwargs):
+        if self._verbose:
+            print(
+                "\nIteration",
+                self._alternating_update_msg() if self.alternating else self.iteration,
+            )
+        return f(self, *args, **kwargs)
+
+    return wrapped
 
 
 class CFRBase:
@@ -20,6 +34,7 @@ class CFRBase:
         ] = None,
         alternating: bool = True,
         verbose: bool = False,
+        seed: Optional[Union[int, np.random.Generator]] = None,
         **regret_minimizer_kwargs,
     ):
         self.root_state = root_state
@@ -28,6 +43,8 @@ class CFRBase:
         self.regret_minimizer_type: Type[
             ExternalRegretMinimizer
         ] = regret_minimizer_type
+        self.seed = seed
+        self.rng = np.random.default_rng(seed)
         self._regret_minimizer_dict: Dict[Infostate, ExternalRegretMinimizer] = {}
         self._regret_minimizer_kwargs = {
             k: v
@@ -57,7 +74,7 @@ class CFRBase:
     def simultaneous(self):
         return not self._alternating
 
-    def average_policy(self, player: Optional[int] = None):
+    def average_policy(self, player: Optional[Player] = None):
         if player is None:
             return self._avg_policy
         else:
@@ -110,16 +127,3 @@ class CFRBase:
 
     def _action_value_map(self, infostate: Optional[Infostate] = None):
         return dict()
-
-
-class StochasticCFRBase(CFRBase):
-    def __init__(
-        self,
-        *args,
-        seed: Optional[Union[int, np.random.Generator]] = None,
-        **kwargs,
-    ):
-        super().__init__(*args, **kwargs)
-
-        self.plan: Dict[Infostate, Action] = {}
-        self.rng = np.random.default_rng(seed)

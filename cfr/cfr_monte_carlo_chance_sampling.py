@@ -6,12 +6,6 @@ from .cfr_vanilla import CFRVanilla
 
 
 class ChanceSamplingCFR(CFRVanilla):
-    def __init__(
-        self, *args, seed: Optional[Union[int, np.random.Generator]] = None, **kwargs
-    ):
-        super().__init__(*args, **kwargs)
-        self.rng: np.random.Generator = np.random.default_rng(seed)
-
     def _traverse_chance_node(self, state, reach_prob, updating_player):
         outcome, outcome_prob = self.rng.choice(state.chance_outcomes())
         state.apply_action(int(outcome))

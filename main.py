@@ -1,3 +1,6 @@
+import itertools
+from collections import defaultdict
+
 import pyspiel
 from open_spiel.python.algorithms import exploitability
 from tqdm import tqdm
@@ -104,15 +107,14 @@ def main(
 
 if __name__ == "__main__":
     n_iters = 10000
-    for minimizer in (rm.RegretMatcherPredictivePlus,):
+    for minimizer in (rm.RegretMatcher,):
         main(
-            cfr.PredictivePlusCFR,
+            cfr.CFRJointReconstruction,
             n_iters,
             regret_minimizer=minimizer,
-            alternating=True,
-            do_print=False,
-            tqdm_print=True,
+            alternating=False,
+            do_print=True,
+            tqdm_print=False,
             only_final_expl_print=False,
-            weighting_mode=cfr.OutcomeSamplingWeightingMode.optimistic,
             seed=0,
         )

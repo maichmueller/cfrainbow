@@ -2,14 +2,14 @@ from collections import defaultdict, deque
 from copy import deepcopy
 from typing import Optional, Dict, Mapping
 
-from .cfr_base import StochasticCFRBase
+from .cfr_base import CFRBase, iterate_log_print
 import pyspiel
 
 from utils import sample_on_policy, counterfactual_reach_prob
-from type_aliases import Action, Infostate, Probability
+from spiel_types import Action, Infostate, Probability
 
 
-class PureCFR(StochasticCFRBase):
+class PureCFR(CFRBase):
     def __init__(
         self,
         *args,
@@ -18,29 +18,22 @@ class PureCFR(StochasticCFRBase):
         super().__init__(*args, **kwargs)
         self.plan: Dict[Infostate, Action] = {}
 
+    @iterate_log_print
     def iterate(
         self,
         traversing_player: Optional[int] = None,
     ):
-        traversing_player = self._cycle_updating_player(traversing_player)
-
-        if self._verbose:
-            print(
-                "\nIteration",
-                self._alternating_update_msg() if self.alternating else self.iteration,
-            )
-        root_reach_probabilities = (
-            {player: 1.0 for player in [-1] + self.players}
-            if self.simultaneous
-            else None
-        )
         # empty the previously sampled strategy
         self.plan.clear()
 
         self._traverse(
             self.root_state.clone(),
-            root_reach_probabilities,
-            traversing_player,
+            reach_prob=(
+                {player: 1.0 for player in [-1] + self.players}
+                if self.simultaneous
+                else None
+            ),
+            traversing_player=self._cycle_updating_player(traversing_player),
         )
         self._iteration += 1
 
@@ -48,13 +41,13 @@ class PureCFR(StochasticCFRBase):
         self,
         state: pyspiel.State,
         reach_prob: Optional[Dict[int, Probability]] = None,
-        updating_player: Optional[int] = None,
+        traversing_player: Optional[int] = None,
     ):
         if state.is_terminal():
             return state.returns()
 
         if state.is_chance_node():
-            return self._traverse_chance_node(state, reach_prob, updating_player)
+            return self._traverse_chance_node(state, reach_prob, traversing_player)
 
         curr_player = state.current_player()
         infostate = state.information_state_string(curr_player)
@@ -65,14 +58,14 @@ class PureCFR(StochasticCFRBase):
 
         sampled_action = self._sample_action(infostate, player_policy)
 
-        if self.simultaneous or curr_player == updating_player:
+        if self.simultaneous or curr_player == traversing_player:
 
             if self.simultaneous:
                 # increment the average policy for the player
                 self._avg_policy_at(curr_player, infostate)[sampled_action] += 1
                 # TODO: Simultaneous updating PURE CFR only works if we actually multiply the counterfactual reach
                 #  probability to the regret increment. Therefore, I am mixing the regret update rule from
-                #  chance-sampling and pure cfr: The state value is computed according to pure-car's sampled
+                #  chance-sampling and pure cfr: The state value is computed according to pure-cfr's sampled
                 #  action-value, but the difference of each action value to the state value is then multiplied by
                 #  the cf. reach probability as in chance-sampling. Why this ends up being a correct regret update
                 #  is unclear, even more so because the policy update is exactly according to pure cfr, and not
@@ -90,7 +83,7 @@ class PureCFR(StochasticCFRBase):
                 action_values[action] = self._traverse(
                     state.child(action),
                     child_reach_prob,
-                    updating_player,
+                    traversing_player,
                 )
             state_value = action_values[sampled_action]
             player_state_value = state_value[curr_player]
@@ -103,7 +96,7 @@ class PureCFR(StochasticCFRBase):
             if curr_player == self._peek_at_next_updating_player():
                 self._avg_policy_at(curr_player, infostate)[sampled_action] += 1
             state.apply_action(sampled_action)
-            state_value = self._traverse(state, reach_prob, updating_player)
+            state_value = self._traverse(state, reach_prob, traversing_player)
 
         return state_value
 
@@ -124,7 +117,7 @@ class PureCFR(StochasticCFRBase):
         return player_policy[infostate]
 
     def _sample_action(
-        self, infostate: Infostate, player_policy: Mapping[Action, Probability]
+        self, infostate: Infostate, player_policy: Mapping[Action, Probability], *args, **kwargs
     ):
         if infostate not in self.plan:
             actions = self.action_list(infostate)

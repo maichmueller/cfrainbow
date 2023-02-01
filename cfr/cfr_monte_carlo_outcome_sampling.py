@@ -1,17 +1,17 @@
 from collections import defaultdict
 from copy import deepcopy
 from enum import Enum
-from typing import Optional, Dict, Union
-import numpy as np
+from typing import Optional, Dict
 
+import numpy as np
 import pyspiel
 
-from .cfr_base import StochasticCFRBase
-from type_aliases import Probability, Action
+from spiel_types import Probability, Action
 from utils import (
     counterfactual_reach_prob,
     sample_on_policy,
 )
+from .cfr_base import CFRBase, iterate_log_print
 
 
 class OutcomeSamplingWeightingMode(Enum):
@@ -20,7 +20,7 @@ class OutcomeSamplingWeightingMode(Enum):
     stochastic = 2
 
 
-class OutcomeSamplingMCCFR(StochasticCFRBase):
+class OutcomeSamplingMCCFR(CFRBase):
     def __init__(
         self,
         *args,
@@ -39,22 +39,15 @@ class OutcomeSamplingMCCFR(StochasticCFRBase):
             self.weight_storage[infostate] = defaultdict(float)
         return self.weight_storage[infostate]
 
+    @iterate_log_print
     def iterate(
         self,
         traversing_player: Optional[int] = None,
     ):
-        traversing_player = self._cycle_updating_player(traversing_player)
-
-        if self._verbose:
-            print(
-                "\nIteration",
-                self._alternating_update_msg() if self.alternating else self.iteration,
-            )
-
         value, tail_prob = self._traverse(
             deepcopy(self.root_state),
             reach_prob={player: 1.0 for player in [-1] + self.players},
-            updating_player=traversing_player,
+            traversing_player=self._cycle_updating_player(traversing_player),
             sample_probability=1.0,
             weights={player: 0.0 for player in self.players}
             if self.weighting_mode == OutcomeSamplingWeightingMode.lazy
@@ -67,7 +60,7 @@ class OutcomeSamplingMCCFR(StochasticCFRBase):
         self,
         state: pyspiel.State,
         reach_prob: dict[int, float],
-        updating_player: Optional[int] = None,
+        traversing_player: Optional[int] = None,
         sample_probability=1.0,
         weights: Optional[dict[int, float]] = None,
     ):
@@ -92,7 +85,7 @@ class OutcomeSamplingMCCFR(StochasticCFRBase):
             return self._traverse(
                 state,
                 reach_prob,
-                updating_player,
+                traversing_player,
                 sample_probability * sample_prob,
                 weights=weights,
             )
@@ -107,7 +100,7 @@ class OutcomeSamplingMCCFR(StochasticCFRBase):
             sampled_action,
             sampled_action_prob,
             sampled_action_sample_prob,
-        ) = self._sample_action(curr_player, updating_player, player_policy)
+        ) = self._sample_action(curr_player, traversing_player, player_policy)
 
         child_reach_prob = deepcopy(reach_prob)
         child_reach_prob[curr_player] *= sampled_action_prob
@@ -122,7 +115,7 @@ class OutcomeSamplingMCCFR(StochasticCFRBase):
         action_value, tail_prob = self._traverse(
             state,
             child_reach_prob,
-            updating_player,
+            traversing_player,
             sample_probability * sampled_action_sample_prob,
             weights=next_weights,
         )
@@ -138,7 +131,7 @@ class OutcomeSamplingMCCFR(StochasticCFRBase):
                 weights,
             )
 
-        if self.simultaneous or updating_player == curr_player:
+        if self.simultaneous or traversing_player == curr_player:
             cf_value_weight = action_value[curr_player] * counterfactual_reach_prob(
                 reach_prob, curr_player
             )
