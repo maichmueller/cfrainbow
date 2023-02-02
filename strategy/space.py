@@ -401,26 +401,29 @@ def behaviour_to_nf_strategy(
         game, players, behavior_strategies
     )
 
-    plans_out = dict()
+    nf_strategies_out = dict()
     for player in players:
-        plan_out = []
-        player_terminal_rp = {
-            z: values[player] for z, values in terminal_reach_prob.items()
-        }
+        nf_player_strategy = []
+        player_terminal_rp = defaultdict(float)
+        player_terminal_rp.update(
+            {z: values[player] for z, values in terminal_reach_prob.items()}
+        )
+        player_plans = plans[player]
         while any(prob > 1e-10 for prob in player_terminal_rp.values()):
             argmax_plan, max_value = tuple(), -float("inf")
-            for plan in plans[player]:
+            for plan in player_plans:
                 minimal_prob = min(
-                    player_terminal_rp[z] for z in reachable_labels_map[plan]
+                    player_terminal_rp[z]
+                    for z in reachable_labels_map[plan]
                 )
                 if minimal_prob > max_value:
                     argmax_plan = plan
                     max_value = minimal_prob
-            plan_out.append((argmax_plan, max_value))
+            nf_player_strategy.append((argmax_plan, max_value))
             for label in reachable_labels_map[argmax_plan]:
                 player_terminal_rp[label] -= max_value
-        plans_out[player] = tuple(plan_out)
-    return plans_out
+        nf_strategies_out[player] = tuple(nf_player_strategy)
+    return nf_strategies_out
 
 
 def terminal_reach_probabilities(
