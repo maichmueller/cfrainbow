@@ -10,14 +10,14 @@ from rm import ExternalRegretMinimizer
 from spiel_types import Action, Infostate, Probability, Player
 
 
-@functools.wraps
 def iterate_logging(f):
+    @functools.wraps(f)
     def wrapped(self, *args, **kwargs):
-        if self._verbose:
+        if self.verbose:
             print(
                 "\nIteration",
                 self._alternating_update_msg() if self.alternating else self.iteration,
-                f"\t Nodes Touched: {self.nodes_touched:.2E}",
+                f"\t Nodes Touched: {self.nodes_touched}",
             )
         return f(self, *args, **kwargs)
 
@@ -45,6 +45,8 @@ class CFRBase:
             ExternalRegretMinimizer
         ] = regret_minimizer_type
         self.seed = seed
+        self.verbose = verbose
+
         self.rng = np.random.default_rng(seed)
         self._regret_minimizer_dict: Dict[Infostate, ExternalRegretMinimizer] = {}
         self._regret_minimizer_kwargs = {
@@ -62,7 +64,6 @@ class CFRBase:
         self._iteration = 0
         self._nodes_touched = 0
         self._alternating = alternating
-        self._verbose = verbose
 
     @property
     def iteration(self):
@@ -78,7 +79,7 @@ class CFRBase:
 
     @property
     def nodes_touched(self):
-        return not self._nodes_touched
+        return self._nodes_touched
 
     def average_policy(self, player: Optional[Player] = None):
         if player is None:
