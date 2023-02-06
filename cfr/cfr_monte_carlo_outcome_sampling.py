@@ -11,7 +11,7 @@ from utils import (
     counterfactual_reach_prob,
     sample_on_policy,
 )
-from .cfr_base import CFRBase, iterate_log_print
+from .cfr_base import CFRBase, iterate_logging
 
 
 class OutcomeSamplingWeightingMode(Enum):
@@ -39,7 +39,7 @@ class OutcomeSamplingMCCFR(CFRBase):
             self.weight_storage[infostate] = defaultdict(float)
         return self.weight_storage[infostate]
 
-    @iterate_log_print
+    @iterate_logging
     def iterate(
         self,
         traversing_player: Optional[int] = None,
@@ -64,6 +64,8 @@ class OutcomeSamplingMCCFR(CFRBase):
         sample_probability=1.0,
         weights: Optional[dict[int, float]] = None,
     ):
+        self._nodes_touched += 1
+
         curr_player = state.current_player()
         if state.is_terminal():
             reward, sample_prob = (

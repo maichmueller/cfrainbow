@@ -109,10 +109,10 @@ if __name__ == "__main__":
     n_iters = 10000
     for minimizer in (rm.RegretMatcher,):
         main(
-            cfr.CFRJointReconstruction,
+            cfr.CFRPlus,
             n_iters,
             regret_minimizer=minimizer,
-            alternating=False,
+            alternating=True,
             do_print=True,
             tqdm_print=False,
             only_final_expl_print=False,

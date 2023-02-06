@@ -4,11 +4,11 @@ from typing import Optional
 import pyspiel
 
 from utils import sample_on_policy
-from .cfr_base import CFRBase, iterate_log_print
+from .cfr_base import CFRBase, iterate_logging
 
 
 class ExternalSamplingMCCFR(CFRBase):
-    @iterate_log_print
+    @iterate_logging
     def iterate(self, traversing_player: Optional[int] = None):
         value = self._traverse(
             deepcopy(self.root_state),
@@ -18,6 +18,8 @@ class ExternalSamplingMCCFR(CFRBase):
         return value
 
     def _traverse(self, state: pyspiel.State, traversing_player: int = 0):
+        self._nodes_touched += 1
+
         current_player = state.current_player()
         if state.is_terminal():
             reward = state.player_return(traversing_player)

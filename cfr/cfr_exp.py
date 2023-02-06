@@ -5,7 +5,7 @@ from typing import Dict, Mapping, Optional, Sequence
 
 import numpy as np
 
-from .cfr_base import CFRBase, iterate_log_print
+from .cfr_base import CFRBase, iterate_logging
 import pyspiel
 
 from utils import counterfactual_reach_prob
@@ -44,7 +44,7 @@ class ExponentialCFR(CFRBase):
                     policy_out[player][infostate][action] = prob / policy_denom[action]
         return policy_out
 
-    @iterate_log_print
+    @iterate_logging
     def iterate(
         self,
         traversing_player: Optional[Player] = None,
@@ -63,6 +63,8 @@ class ExponentialCFR(CFRBase):
         reach_prob: dict[Action, Probability],
         traversing_player: Optional[Player] = None,
     ):
+        self._nodes_touched += 1
+
         if state.is_terminal():
             reward = state.returns()
             return reward

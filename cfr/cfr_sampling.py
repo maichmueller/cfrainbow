@@ -1,37 +1,14 @@
-from __future__ import annotations
 import itertools
 from collections import defaultdict
 from copy import deepcopy
-from typing import Optional, Dict, Mapping, Sequence, Union
+from typing import Optional, Dict, Mapping
 
-import numpy as np
 import pyspiel
-from click import Tuple
 
-from spiel_types import Action, Infostate, Probability, NormalFormPlan
+from spiel_types import Action, Infostate, Probability, JointNormalFormPlan
 from utils import sample_on_policy, counterfactual_reach_prob
-from .cfr_base import iterate_log_print
+from .cfr_base import iterate_logging
 from .cfr_pure import PureCFR
-
-
-class JointNormalFormPlan:
-    def __init__(self, plans: Sequence[NormalFormPlan]):
-        self.plans: tuple[NormalFormPlan] = tuple(plans)
-        self.hash = hash(tuple(elem for elem in itertools.chain(self.plans)))
-
-    def __contains__(self, item):
-        return any(item in plan for plan in self.plans)
-
-    def __hash__(self):
-        return self.hash
-
-    def __eq__(self, other: Union[Sequence[NormalFormPlan], JointNormalFormPlan]):
-        if isinstance(other, JointNormalFormPlan):
-            return self.plans == other.plans
-        return all(other_plan == plan for other_plan, plan in zip(other, self.plans))
-
-    def __repr__(self):
-        return repr(self.plans)
 
 
 class SamplingCFR(PureCFR):
@@ -50,7 +27,13 @@ class SamplingCFR(PureCFR):
         # 'sum of play' since it is prior to division by the iteration count 'T'.
         self.empirical_sum_of_play: Dict[JointNormalFormPlan, int] = defaultdict(int)
 
-    @iterate_log_print
+    def empirical_frequency_of_play(self):
+        return tuple(
+            (plan, probability / self.iteration)
+            for plan, probability in self.empirical_sum_of_play.items()
+        )
+
+    @iterate_logging
     def iterate(
         self,
         traversing_player: Optional[int] = None,
@@ -77,6 +60,8 @@ class SamplingCFR(PureCFR):
         reach_prob: Optional[Dict[int, Probability]] = None,
         traversing_player: Optional[int] = None,
     ):
+        self._nodes_touched += 1
+
         if state.is_terminal():
             return state.returns()
 

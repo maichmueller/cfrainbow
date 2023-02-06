@@ -109,7 +109,7 @@ class InternalFromExternalRegretMinimizer(InternalRegretMinimizer):
         self, iteration: int, loss: Callable[[Action], float], *args, **kwargs
     ):
         for assigned_action, erm in self.external_minimizer.items():
-            erm.observe_regret(
+            erm.observe_utility(
                 iteration,
                 lambda a: loss(a)
                 * self.recommendation[assigned_action]

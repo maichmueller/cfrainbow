@@ -13,7 +13,7 @@ from typing import (
     Union,
     Mapping,
     Optional,
-    Generator,
+    Generator, Callable,
 )
 import numpy as np
 import pyspiel
@@ -26,8 +26,10 @@ from spiel_types import (
     NormalFormStrategySpace,
     Probability,
     Player,
+    JointNormalFormPlan,
+    JointNormalFormStrategy,
 )
-from utils import all_states_gen
+from utils import all_states_gen, normalize_state_policy
 
 
 class DepthInformedSequence(NamedTuple):
@@ -199,12 +201,12 @@ def reduced_nf_space_gen(
         sequence_spaces = sequence_space(game, *players)
 
     assert all(
-        a == b for a, b in zip(sorted(sequence_spaces.keys()), sorted(players))
-    ), "Sequence spaces map does not hold an entry for each player passed."
+        p in sequence_spaces for p in sorted(players)
+    ), f"Sequence spaces map does not hold an entry for each player passed."
 
-    for player, sequences in sequence_spaces.items():
+    for player in players:
         for seq_lists_combo in itertools.product(
-            *infostate_sequences(sequences).values()
+            *infostate_sequences(sequence_spaces[player]).values()
         ):
             yield tuple(
                 (infostate, action)
@@ -226,7 +228,7 @@ def reduced_nf_space(
         sequence_spaces = sequence_space(game, *players)
     for player, sequences in sequence_spaces.items():
         spaces[player] = set(
-            reduced_nf_space_gen(game, *players, sequence_spaces=sequence_spaces)
+            reduced_nf_space_gen(game, player, sequence_spaces=sequence_spaces)
         )
     return spaces
 
@@ -286,13 +288,14 @@ def infostate_sequences(sequences: Dict[Tuple[Infostate, Action], SequenceAttr])
     return infostate_sequences
 
 
-def nf_expected_payoff(
+def nf_plan_expected_payoff(
     game: pyspiel.Game,
-    joint_plan: Union[List[NormalFormPlan], Dict[Infostate, Action], NormalFormPlan],
+    joint_plan: Union[JointNormalFormPlan, Dict[Infostate, Action], NormalFormPlan],
 ):
-    if isinstance(joint_plan, list):
+    if isinstance(joint_plan, JointNormalFormPlan):
         joint_plan = {
-            infostate: action for infostate, action in itertools.chain(*joint_plan)
+            infostate: action
+            for infostate, action in itertools.chain(*joint_plan.plans)
         }
     elif isinstance(joint_plan, tuple):
         joint_plan = {infostate: action for infostate, action in joint_plan}
@@ -318,12 +321,38 @@ def nf_expected_payoff(
     return expected_payoff
 
 
+class _KeyDependantDefaultDict(defaultdict):
+    def __missing__(self, key):
+        self[key] = value = self.default_factory(key)
+        return value
+
+
+def nf_strategy_expected_payoff(
+    game: pyspiel.Game,
+    joint_strategy: JointNormalFormStrategy,
+    payoff_table: Optional[Dict[JointNormalFormPlan, Sequence[float]]] = None,
+):
+    if payoff_table is None:
+        payoff_table = _KeyDependantDefaultDict(lambda joint_plan: nf_expected_payoff_table(game, joint_plan))
+    root = game.new_initial_state()
+    expected_payoff = np.zeros(root.num_players())
+    for joint_strategy in itertools.product(*joint_strategy.strategies):
+        j_prob = 1.
+        j_plan = []
+        for plan, prob in joint_strategy:
+            j_prob *= prob
+            j_plan.append(plan)
+        expected_payoff += j_prob * np.asarray(payoff_table[JointNormalFormPlan(j_plan)])
+
+    return expected_payoff
+
+
 def nf_expected_payoff_table(
     game: pyspiel.Game, strategy_spaces: Sequence[NormalFormStrategySpace]
 ):
     payoffs: Dict[Tuple[NormalFormPlan], Sequence[float]] = dict()
     for joint_profile in itertools.product(*strategy_spaces):
-        payoffs[joint_profile] = nf_expected_payoff(
+        payoffs[joint_profile] = nf_plan_expected_payoff(
             game,
             {
                 infostate: action
@@ -413,8 +442,7 @@ def behaviour_to_nf_strategy(
             argmax_plan, max_value = tuple(), -float("inf")
             for plan in player_plans:
                 minimal_prob = min(
-                    player_terminal_rp[z]
-                    for z in reachable_labels_map[plan]
+                    player_terminal_rp[z] for z in reachable_labels_map[plan]
                 )
                 if minimal_prob > max_value:
                     argmax_plan = plan
@@ -424,6 +452,27 @@ def behaviour_to_nf_strategy(
                 player_terminal_rp[label] -= max_value
         nf_strategies_out[player] = tuple(nf_player_strategy)
     return nf_strategies_out
+
+
+def nf_to_behaviour_strategy(
+    players: Sequence[Player],
+    normal_form_strategies: Mapping[
+        Player, Sequence[Tuple[NormalFormPlan, Probability]]
+    ],
+) -> Dict[Infostate, Dict[Action, Probability]]:
+
+    behaviour_strategies_out = dict()
+    for player in players:
+        behavioural_strategy = dict()
+        nf_strategy = tuple(normal_form_strategies[player])
+        for plan, probability in nf_strategy:
+            for infostate, action in plan:
+                behavioural_strategy.setdefault(infostate, dict())
+                policy = behavioural_strategy[infostate]
+                policy.setdefault(action, 0.0)
+                policy[action] += probability
+        behaviour_strategies_out[player] = normalize_state_policy(behavioural_strategy)
+    return behaviour_strategies_out
 
 
 def terminal_reach_probabilities(

@@ -1,7 +1,7 @@
 from copy import deepcopy
 from typing import Dict, Mapping, Optional, Sequence
 
-from .cfr_base import CFRBase, iterate_log_print
+from .cfr_base import CFRBase, iterate_logging
 from spiel_types import Action, Infostate, Probability, Value
 
 from rm import ExternalRegretMinimizer
@@ -11,7 +11,7 @@ from utils import counterfactual_reach_prob
 
 
 class CFRVanilla(CFRBase):
-    @iterate_log_print
+    @iterate_logging
     def iterate(
         self,
         traversing_player: Optional[int] = None,
@@ -29,6 +29,8 @@ class CFRVanilla(CFRBase):
         reach_prob_map: dict[Action, Probability],
         traversing_player: Optional[int] = None,
     ):
+        self._nodes_touched += 1
+
         if state.is_terminal():
             return state.returns()
 
@@ -113,6 +115,11 @@ class CFRVanilla(CFRBase):
             self.iteration,
             lambda a: cf_reach_p * (action_values[a][curr_player] - player_state_value),
         )
+        # alternatively one could also call the following (although this will simply recompute state_value):
+        # regret_minimizer.observe_utility(
+        #     self.iteration,
+        #     lambda a: cf_reach_p * action_values[a][curr_player],
+        # )
 
     def _update_avg_policy(
         self,

@@ -26,7 +26,9 @@ class CFRJointReconstruction(CFRVanilla):
         kwargs["alternating"] = False
         super().__init__(*args, **kwargs)
         # the storage of all played strategy profiles in the iterations.
-        self.empirical_freq_of_play: Dict[JointNormalFormPlan, float] = defaultdict(float)
+        self.empirical_freq_of_play: Dict[JointNormalFormPlan, float] = defaultdict(
+            float
+        )
         # after how many rounds of vanilla cfr we convert the current strategy to normal-form again.
         # This counts FULL iteration steps, i.e. for n players we have that every n algorithm iterations are 1
         # conversion relevant iteration, so that each player has seen their current strategies equally often updated.
@@ -64,16 +66,38 @@ class CFRJointReconstruction(CFRVanilla):
                 curr_behaviour_policy[owner][infostate] = regret_minimizer.recommend(
                     self.iteration
                 )
-            normal_form_policy_profile =                 tuple(behaviour_to_nf_strategy(
+            normal_form_policy_profile = tuple(
+                behaviour_to_nf_strategy(
                     self._underlying_game,
                     self.players,
                     curr_behaviour_policy,
                     reachable_labels_map=self._reachable_labels,
                     plans=self._reduced_nf_space,
-                ).values())
+                ).values()
+            )
+            jo_p = 0.0
             for combo in itertools.product(*normal_form_policy_profile):
-                strategies, joint_prob = [], 1.
+                strategies, joint_prob = [], 1.0
                 for player_strategy, prob in combo:
                     strategies.append(player_strategy)
                     joint_prob *= prob
-                self.empirical_freq_of_play[JointNormalFormPlan(tuple(strategies))] += joint_prob
+                jo_p += joint_prob
+                print(jo_p)
+                self.empirical_freq_of_play[
+                    JointNormalFormPlan(tuple(strategies))
+                ] += joint_prob
+            print("Iteration", self.iteration)
+            print(
+                sum(
+                    [
+                        v / (self.iteration / self._conversion_frequency)
+                        for v in self.empirical_freq_of_play.values()
+                    ]
+                )
+            )
+
+    def empirical_frequency_of_play(self):
+        return tuple(
+            (plan, probability / (self.iteration / self._conversion_frequency))
+            for plan, probability in self.empirical_freq_of_play.items()
+        )
