@@ -99,12 +99,12 @@ def hedge(
 
 
 class ExternalRegretMinimizer(ABC):
-    def __init__(
-        self, actions: Iterable[Action], *args, regret_based: bool = True, **kwargs
-    ):
+
+    regret_mode: bool = True
+
+    def __init__(self, actions: Iterable[Action], *args, **kwargs):
         self._actions = list(actions)
         self._recommendation_computed: bool = False
-        self._regret_mode: bool = True
         self._n_actions = len(self._actions)
         self._last_update_time: int = -1
 
@@ -122,17 +122,10 @@ class ExternalRegretMinimizer(ABC):
     def __len__(self):
         return self._n_actions
 
+
     @property
     def actions(self):
         return self._actions
-
-    @property
-    def utility_mode(self):
-        return not self._regret_mode
-
-    @property
-    def regret_mode(self):
-        return self._regret_mode
 
     @property
     def last_update_time(self):
@@ -280,6 +273,9 @@ def anytime_hedge_rate(iteration: int, nr_actions: int) -> float:
 
 
 class Hedge(ExternalRegretMinimizer):
+
+    regret_mode = False
+
     def __init__(
         self,
         actions: Iterable[Action],
@@ -287,7 +283,6 @@ class Hedge(ExternalRegretMinimizer):
         learning_rate: Callable[[int, int], float] = anytime_hedge_rate,
         **kwargs,
     ):
-        kwargs.update(dict(regret_mode=False))
         super().__init__(actions, *args, **kwargs)
         # function computing the learning rate for the given iteration and nr of actions to consider
         self._learning_rate: Callable[[int, int], float] = learning_rate
