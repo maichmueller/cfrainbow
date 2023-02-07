@@ -1,5 +1,6 @@
 from .external import (
     ExternalRegretMinimizer,
+    Hedge,
     RegretMatcher,
     RegretMatcherPlus,
     RegretMatcherDiscounted,

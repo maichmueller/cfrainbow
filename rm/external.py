@@ -102,6 +102,7 @@ class ExternalRegretMinimizer(ABC):
     def __init__(self, actions: Iterable[Action], *args, **kwargs):
         self._actions = list(actions)
         self._recommendation_computed: bool = False
+        self._utility_used: bool = False
         self._n_actions = len(self._actions)
         self._last_update_time: int = -1
 
@@ -128,6 +129,7 @@ class ExternalRegretMinimizer(ABC):
             self.cumulative_regret[action] = 0.0
         self.recommendation.clear()
         self._recommendation_computed = False
+        self._utility_used = False
         self._last_update_time: int = -1
 
     def recommend(self, iteration: int, *args, force: bool = False, **kwargs):
@@ -138,14 +140,6 @@ class ExternalRegretMinimizer(ABC):
         ):
             self._recommend(iteration, *args, **kwargs)
         return self.recommendation
-
-    @abstractmethod
-    def _recommend(
-        self, iteration: Optional[int] = None, *args, **kwargs
-    ) -> Dict[Action, Probability]:
-        raise NotImplementedError(
-            f"method '{self._recommend.__name__}' is not implemented."
-        )
 
     @abstractmethod
     def observe_regret(
@@ -162,6 +156,24 @@ class ExternalRegretMinimizer(ABC):
         raise NotImplementedError(
             f"method '{self.observe_utility.__name__}' is not implemented."
         )
+
+    @abstractmethod
+    def _recommend(
+        self, iteration: Optional[int] = None, *args, **kwargs
+    ) -> Dict[Action, Probability]:
+        raise NotImplementedError(
+            f"method '{self._recommend.__name__}' is not implemented."
+        )
+
+    def _apply_utility(self):
+        if self._utility_used:
+            avg_utility = sum(self.utility.values()) / len(self.utility)
+            for action, utility in self.utility.items():
+                self.cumulative_regret[action] += utility - avg_utility
+                # reset the action's utility storage
+                self.utility[action] = 0.0
+            # reset the flag
+            self._utility_used = False
 
 
 class RegretMatcher(ExternalRegretMinimizer):
@@ -184,12 +196,7 @@ class RegretMatcher(ExternalRegretMinimizer):
         self._recommendation_computed = False
 
     def _recommend(self, *args, **kwargs):
-        if self.utility:
-            avg_utility = sum(self.utility.values()) / len(self.utility)
-            for action, utility in self.utility.items():
-                self.cumulative_regret[action] += utility - avg_utility
-                # reset the action's utility storage
-                self.utility[action] = 0.0
+        self._apply_utility()
         regret_matching(self.recommendation, self.cumulative_regret)
         self._recommendation_computed = True
 
@@ -287,7 +294,7 @@ def anytime_hedge_rate(iteration: int, nr_actions: int) -> float:
     float
         the learning rate for the anytime hedge update.
     """
-    return math.exp(math.sqrt(nr_actions / iteration))
+    return math.exp(math.sqrt(nr_actions / (iteration + 1)))
 
 
 class Hedge(ExternalRegretMinimizer):
@@ -312,7 +319,7 @@ class Hedge(ExternalRegretMinimizer):
         self._last_update_time = iteration
         self._recommendation_computed = False
 
-    def _recommend(self, iteration, *args, **kwargs):
+    def _recommend(self, iteration: Optional[int] = None, *args, **kwargs):
         hedge(
             self.recommendation,
             self.cumulative_regret,

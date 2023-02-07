@@ -18,8 +18,12 @@ class InternalRegretMinimizer(ABC):
     def __init__(self, actions: Iterable[Action], *args, **kwargs):
         self.recommendation: Dict[Action, Probability] = {}
         self._actions = list(actions)
+        self._n_actions = len(self.actions)
         self._recommendation_computed: bool = False
         self._last_update_time: int = -1
+
+    def __len__(self):
+        return self._n_actions
 
     @property
     def actions(self):
@@ -123,8 +127,8 @@ class InternalFromExternalRegretMinimizer(InternalRegretMinimizer):
         self._last_update_time = iteration
         self._recommendation_computed = False
 
-    def _recommend(self, iteration: int = None, force: bool = False):
-        n_actions = len(self.actions)
+    def _recommend(self, iteration: int = None, force: bool = False, *args, **kwargs):
+        n_actions = len(self)
         # build the recommendations matrix
         recommendations = np.empty(shape=(n_actions, n_actions), dtype=float)
         for i, action_from in enumerate(self.actions):
@@ -135,7 +139,8 @@ class InternalFromExternalRegretMinimizer(InternalRegretMinimizer):
                 external_recommendation[action_to]
                 for j, action_to in enumerate(self.actions)
             ]
-        # compute the stationary distribution of the markov chain transition matrix determined by the rec. matrix.
+        # compute the stationary distribution of the markov chain transition matrix
+        # determined by the recommendation matrix.
         # This will be the eigenvector to the eigenvalue 1.
         eigenvalues, eigenvectors = np.linalg.eig(recommendations.transpose())
         rec = eigenvectors[np.where(np.isclose(eigenvalues, 1.0))[0]]
