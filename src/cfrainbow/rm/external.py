@@ -1,7 +1,6 @@
 import cmath
 import math
 from abc import ABC, abstractmethod
-from collections import defaultdict
 from typing import (
     Dict,
     Callable,
@@ -11,7 +10,7 @@ from typing import (
 
 from numba import njit
 
-from spiel_types import *
+from src.cfrainbow.spiel_types import *
 
 
 def normalize_or_uniformize_policy(policy, pos_regret_dict, pos_regret_sum):

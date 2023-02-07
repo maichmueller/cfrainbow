@@ -13,10 +13,8 @@ from tqdm import tqdm
 from collections import Counter, defaultdict
 from multiprocessing import Pool, cpu_count
 
-import rm
-from main import main
-
-from cfr import *
+from cfrainbow import rm
+from cfrainbow.main import main
 
 
 def plot_cfr_convergence(

@@ -1,16 +1,14 @@
 import itertools
-import operator
 from collections import defaultdict
-from functools import reduce
 from typing import Optional, Dict, Mapping, List
 
-from spiel_types import NormalFormPlan, JointNormalFormPlan
-from strategy import (
+from src.cfrainbow.spiel_types import NormalFormPlan, JointNormalFormPlan
+from cfrainbow.strategy import (
     reachable_terminal_states,
     reduced_nf_space,
     behaviour_to_nf_strategy,
 )
-from utils import infostates_gen
+from src.cfrainbow.utils import infostates_gen
 from .cfr_vanilla import CFRVanilla
 
 

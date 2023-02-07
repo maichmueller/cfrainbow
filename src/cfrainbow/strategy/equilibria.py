@@ -3,7 +3,7 @@ import itertools
 from collections import defaultdict
 from typing import Sequence, Dict, Mapping, Tuple
 
-from spiel_types import (
+from src.cfrainbow.spiel_types import (
     NormalFormPlan,
     NormalFormStrategy,
     NormalFormStrategySpace,

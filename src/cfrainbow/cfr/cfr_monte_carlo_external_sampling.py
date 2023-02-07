@@ -3,7 +3,7 @@ from typing import Optional
 
 import pyspiel
 
-from utils import sample_on_policy
+from src.cfrainbow.utils import sample_on_policy
 from .cfr_base import CFRBase, iterate_logging
 
 

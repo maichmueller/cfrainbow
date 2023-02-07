@@ -1,21 +1,30 @@
-from collections import defaultdict, deque
 from copy import deepcopy
-from typing import Optional, Dict, Mapping
+from typing import Optional, Dict, Mapping, Type
 
-from .cfr_base import CFRBase, iterate_logging
+from cfrainbow.rm import ExternalRegretMinimizer, InternalRegretMinimizer
+from . import PureCFR
+from .cfr_base import iterate_logging
 import pyspiel
 
-from utils import sample_on_policy, counterfactual_reach_prob
-from spiel_types import Action, Infostate, Probability
+from src.cfrainbow.utils import sample_on_policy, counterfactual_reach_prob
+from src.cfrainbow.spiel_types import Action, Infostate, Probability
 
 
-class PureCFR(CFRBase):
+class InternalCFR(PureCFR):
     def __init__(
         self,
-        *args,
+        root_state: pyspiel.State,
+        external_regret_minimizer_type: Type[ExternalRegretMinimizer],
+        internal_regret_minimizer_type: Type[InternalRegretMinimizer],
+        external_rm_kwargs: Mapping,
+        internal_rm_kwargs: Mapping,
         **kwargs,
     ):
-        super().__init__(*args, **kwargs)
+        super().__init__(root_state, external_regret_minimizer_type, **external_rm_kwargs, **kwargs)
+        self._internal_regret_minimizer_type: Type[
+            InternalRegretMinimizer
+        ] = internal_regret_minimizer_type
+        self._internal_regret_minimizer_kwargs: Mapping = internal_rm_kwargs
         self.plan: Dict[Infostate, Action] = {}
 
     @iterate_logging
@@ -43,8 +52,6 @@ class PureCFR(CFRBase):
         reach_prob: Optional[Dict[int, Probability]] = None,
         traversing_player: Optional[int] = None,
     ):
-        self._nodes_touched += 1
-
         if state.is_terminal():
             return state.returns()
 
@@ -119,7 +126,11 @@ class PureCFR(CFRBase):
         return player_policy[infostate]
 
     def _sample_action(
-        self, infostate: Infostate, player_policy: Mapping[Action, Probability], *args, **kwargs
+        self,
+        infostate: Infostate,
+        player_policy: Mapping[Action, Probability],
+        *args,
+        **kwargs,
     ):
         if infostate not in self.plan:
             actions = self.action_list(infostate)

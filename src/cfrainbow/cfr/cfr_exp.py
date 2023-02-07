@@ -1,15 +1,14 @@
 from collections import defaultdict
 from copy import deepcopy
-from enum import Enum
-from typing import Dict, Mapping, Optional, Sequence
+from typing import Dict, Optional, Sequence
 
 import numpy as np
 
 from .cfr_base import CFRBase, iterate_logging
 import pyspiel
 
-from utils import counterfactual_reach_prob
-from spiel_types import Action, Infostate, Probability, Regret, Value, Player
+from src.cfrainbow.utils import counterfactual_reach_prob
+from src.cfrainbow.spiel_types import Action, Infostate, Probability, Regret, Player
 
 
 class ExponentialCFR(CFRBase):

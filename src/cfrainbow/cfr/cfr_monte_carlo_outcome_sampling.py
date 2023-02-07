@@ -6,8 +6,8 @@ from typing import Optional, Dict
 import numpy as np
 import pyspiel
 
-from spiel_types import Probability, Action
-from utils import (
+from src.cfrainbow.spiel_types import Probability, Action
+from src.cfrainbow.utils import (
     counterfactual_reach_prob,
     sample_on_policy,
 )

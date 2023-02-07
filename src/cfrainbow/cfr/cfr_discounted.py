@@ -2,7 +2,7 @@ from typing import Type
 
 import pyspiel
 
-import rm
+from .. import rm
 from .cfr_vanilla import CFRVanilla
 
 

@@ -2,12 +2,12 @@ from copy import deepcopy
 from typing import Dict, Mapping, Optional, Sequence
 
 from .cfr_base import CFRBase, iterate_logging
-from spiel_types import Action, Infostate, Probability, Value
+from src.cfrainbow.spiel_types import Action, Infostate, Probability, Value
 
-from rm import ExternalRegretMinimizer
+from cfrainbow.rm import ExternalRegretMinimizer
 import pyspiel
 
-from utils import counterfactual_reach_prob
+from src.cfrainbow.utils import counterfactual_reach_prob
 
 
 class CFRVanilla(CFRBase):

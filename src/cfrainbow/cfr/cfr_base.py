@@ -6,8 +6,8 @@ from typing import Dict, Optional, Type, Sequence, MutableMapping, Union
 import numpy as np
 import pyspiel
 
-from rm import ExternalRegretMinimizer
-from spiel_types import Action, Infostate, Probability, Player
+from cfrainbow.rm import ExternalRegretMinimizer
+from src.cfrainbow.spiel_types import Action, Infostate, Probability, Player
 
 
 def iterate_logging(f):

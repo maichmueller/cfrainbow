@@ -1,13 +1,12 @@
-import itertools
-from collections import defaultdict
+import inspect
 from typing import Optional
 
 import pyspiel
 from open_spiel.python.algorithms import exploitability
 from tqdm import tqdm
 
-import rm
 import cfr
+import rm
 
 from utils import (
     all_states_gen,
@@ -17,7 +16,6 @@ from utils import (
     normalize_policy_profile,
     slice_kwargs,
 )
-import inspect
 
 
 def main(

@@ -5,8 +5,8 @@ from typing import Optional, Dict, Mapping
 
 import pyspiel
 
-from spiel_types import Action, Infostate, Probability, JointNormalFormPlan
-from utils import sample_on_policy, counterfactual_reach_prob
+from src.cfrainbow.spiel_types import Action, Infostate, Probability, JointNormalFormPlan
+from src.cfrainbow.utils import sample_on_policy, counterfactual_reach_prob
 from .cfr_base import iterate_logging
 from .cfr_pure import PureCFR
 

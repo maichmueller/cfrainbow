@@ -1,0 +1,51 @@
+[build-system]
+requires = ["poetry"]
+build-backend = "poetry.masonry.api"
+
+[tool.poetry]
+name = 'cfrainbow'
+version = '0.1.0'
+authors = [
+    'Michael Aichmueller <m.aichmueller@gmail.com>'
+]
+license = 'MIT license'
+description = 'Counterfactual Regret Minimization Open-Source Implementations'
+keywords = ['counterfactual regret minimization',
+    'regret minimization',
+    'cfr',
+    'cfr+',
+    'discounted cfr',
+    'linear',
+    'monte-carlo',
+    'openspiel',
+]
+homepage = 'https://github.com/maichmueller/cfrainbow'
+classifiers = [
+    'Development Status :: 3 - Alpha',
+    'Intended Audience :: Science/Research',
+    'License :: OSI Approved :: MIT License',
+    'Natural Language :: English',
+    'Programming Language :: Python :: 3.8',
+    'Programming Language :: Python :: 3.9',
+    'Programming Language :: Python :: 3.10',
+    'Operating System :: MacOS :: MacOS X',
+    'Operating System :: POSIX :: Linux',
+    'Topic :: Scientific/Engineering :: Mathematics'
+]
+packages = [
+    { include = "cfrainbow", from = "src" },
+]
+
+
+[tool.poetry.dependencies]
+# Compatible Python versions
+python = ">=3.8"
+numpy = [
+    { version = ">=1.22", python = ">=3.10" },
+    { version = ">=1.19", python = "<=3.9" }
+]
+openspiel = { version = ">=1.0" }
+
+[tool.poetry.group.dev.dependencies]
+pytest = "*"
+pytest-cov = "*"
