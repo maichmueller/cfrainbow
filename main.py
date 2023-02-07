@@ -1,5 +1,6 @@
 import itertools
 from collections import defaultdict
+from typing import Optional
 
 import pyspiel
 from open_spiel.python.algorithms import exploitability
@@ -27,6 +28,7 @@ def main(
     do_print: bool = True,
     tqdm_print: bool = False,
     only_final_expl_print: bool = False,
+    expl_threshold: Optional[float] = None,
     **kwargs,
 ):
     # get all kwargs that can be found in the parent classes' and the given class's __init__ func
@@ -58,8 +60,7 @@ def main(
     )
 
     gen = range(n_iter)
-    pbar = tqdm(gen)
-    for i in gen if not tqdm_print else pbar:
+    for i in gen if not tqdm_print else (pbar := tqdm(gen)):
         if tqdm_print:
             pbar.set_description(
                 f"Method:{cfr_class.__name__} | "
@@ -94,6 +95,10 @@ def main(
                         f"---------------------------------------------------------------"
                     )
 
+            if expl_threshold is not None and expl_values[-1] < expl_threshold:
+                print(f"Exploitability threshold of {expl_threshold} reached.")
+                break
+
     avg_policy = solver.average_policy()
     if (
         (do_print or only_final_expl_print)
@@ -106,15 +111,17 @@ def main(
 
 
 if __name__ == "__main__":
-    n_iters = 10000
+    # n_iters = 10000
+    n_iters = int(1e10)
     for minimizer in (rm.RegretMatcher,):
         main(
-            cfr.CFRPlus,
+            cfr.ExponentialCFR,
             n_iters,
             regret_minimizer=minimizer,
             alternating=True,
-            do_print=True,
-            tqdm_print=False,
+            do_print=False,
+            tqdm_print=True,
             only_final_expl_print=False,
+            expl_threshold=1e-3,
             seed=0,
         )

@@ -62,7 +62,7 @@ class CFRVanilla(CFRBase):
             return state_value
 
     def _traverse_chance_node(self, state, reach_prob, updating_player):
-        state_value = [0.] * self.nr_players
+        state_value = [0.0] * self.nr_players
         for outcome, outcome_prob in state.chance_outcomes():
             next_state = state.child(outcome)
 
@@ -78,7 +78,7 @@ class CFRVanilla(CFRBase):
         self, state, infostate, reach_prob, updating_player, action_values
     ):
         current_player = state.current_player()
-        state_value = [0.] * self.nr_players
+        state_value = [0.0] * self.nr_players
 
         regret_minimizer = self.regret_minimizer(infostate)
         current_policy = regret_minimizer.recommend(
@@ -92,9 +92,7 @@ class CFRVanilla(CFRBase):
             child_reach_prob[current_player] *= action_prob
             next_state = state.child(action)
 
-            child_value = self._traverse(
-                next_state, child_reach_prob, updating_player
-            )
+            child_value = self._traverse(next_state, child_reach_prob, updating_player)
             action_values[action] = child_value
             for p in self.players:
                 state_value[p] += action_prob * child_value[p]
@@ -109,17 +107,14 @@ class CFRVanilla(CFRBase):
         reach_probs: Dict[int, Probability],
         curr_player: int,
     ):
-        player_state_value = state_value[curr_player]
+        player_state_value = (
+            state_value[curr_player] if regret_minimizer.regret_mode else 0.0
+        )
         cf_reach_p = counterfactual_reach_prob(reach_probs, curr_player)
-        regret_minimizer.observe_regret(
+        regret_minimizer.observe(
             self.iteration,
             lambda a: cf_reach_p * (action_values[a][curr_player] - player_state_value),
         )
-        # alternatively one could also call the following (although this will simply recompute state_value):
-        # regret_minimizer.observe_utility(
-        #     self.iteration,
-        #     lambda a: cf_reach_p * action_values[a][curr_player],
-        # )
 
     def _update_avg_policy(
         self,

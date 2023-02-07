@@ -96,7 +96,7 @@ class SamplingCFR(PureCFR):
         player_state_value = state_value[curr_player]
 
         cf_reach_prob = counterfactual_reach_prob(reach_prob, curr_player)
-        regret_minimizer.observe_regret(
+        regret_minimizer.observe(
             self.iteration,
             lambda a: (
                 cf_reach_prob * (action_values[a][curr_player] - player_state_value)

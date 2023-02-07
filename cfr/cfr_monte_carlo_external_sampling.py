@@ -49,7 +49,7 @@ class ExternalSamplingMCCFR(CFRBase):
                 )
                 state_value += player_policy[action] * action_values[action]
 
-            regret_minimizer.observe_regret(
+            regret_minimizer.observe(
                 self.iteration, lambda a: action_values[a] - state_value
             )
             return state_value

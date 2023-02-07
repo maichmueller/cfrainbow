@@ -112,7 +112,7 @@ class InternalFromExternalRegretMinimizer(InternalRegretMinimizer):
         self, iteration: int, regret: Callable[[Action, Action], float], *args, **kwargs
     ):
         for assigned_action, erm in self.external_minimizer.items():
-            erm.observe_regret(iteration, lambda a: regret(assigned_action, a))
+            erm.observe(iteration, lambda a: regret(assigned_action, a))
         self._last_update_time = iteration
         self._recommendation_computed = False
 

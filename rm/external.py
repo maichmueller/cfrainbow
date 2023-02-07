@@ -86,12 +86,12 @@ def predictive_regret_matching_plus(
 
 def hedge(
     policy: MutableMapping[Action, Probability],
-    cumul_regret_map: Mapping[Action, float],
+    cumul_utility_map: Mapping[Action, float],
     lr: float,
 ):
     sum_weights = 0.0
-    for action, regret in cumul_regret_map.items():
-        new_weight = math.exp(-lr * regret)
+    for action, utility in cumul_utility_map.items():
+        new_weight = math.exp(-lr * utility)
         sum_weights += new_weight
         policy[action] = new_weight
     for action in policy:
@@ -99,16 +99,25 @@ def hedge(
 
 
 class ExternalRegretMinimizer(ABC):
-    def __init__(self, actions: Iterable[Action], *args, **kwargs):
+    def __init__(
+        self, actions: Iterable[Action], *args, regret_based: bool = True, **kwargs
+    ):
         self._actions = list(actions)
         self._recommendation_computed: bool = False
-        self._utility_used: bool = False
+        self._regret_mode: bool = True
         self._n_actions = len(self._actions)
         self._last_update_time: int = -1
 
-        self.cumulative_regret: Dict[Action, float] = {a: 0.0 for a in self.actions}
-        self.utility: Dict[Action, float] = defaultdict(float)
-        self.recommendation: Dict[Action, Probability] = {}
+        # the initial recommendation always suggests a uniform play over all actions
+        uniform_prob = 1.0 / len(self.actions)
+        self.recommendation: Dict[Action, Probability] = {
+            a: uniform_prob for a in actions
+        }
+        # the cumulative quantity is either...
+        # 1. the cumulative regret (if regret based)
+        # 2. the cumulative utility (else)
+        # it is the storage of the quantity upon which the minimizer bases its recommendations.
+        self.cumulative_quantity: Dict[Action, float] = {a: 0.0 for a in self.actions}
 
     def __len__(self):
         return self._n_actions
@@ -118,18 +127,22 @@ class ExternalRegretMinimizer(ABC):
         return self._actions
 
     @property
+    def utility_mode(self):
+        return not self._regret_mode
+
+    @property
+    def regret_mode(self):
+        return self._regret_mode
+
+    @property
     def last_update_time(self):
         return self._last_update_time
 
-    def regret(self, action: Action):
-        return self.cumulative_regret[action]
-
     def reset(self):
         for action in self.actions:
-            self.cumulative_regret[action] = 0.0
+            self.cumulative_quantity[action] = 0.0
         self.recommendation.clear()
         self._recommendation_computed = False
-        self._utility_used = False
         self._last_update_time: int = -1
 
     def recommend(self, iteration: int, *args, force: bool = False, **kwargs):
@@ -141,21 +154,26 @@ class ExternalRegretMinimizer(ABC):
             self._recommend(iteration, *args, **kwargs)
         return self.recommendation
 
-    @abstractmethod
-    def observe_regret(
-        self, iteration: int, regret: Callable[[Action, Action], float], *args, **kwargs
+    def observe(
+        self,
+        iteration: int,
+        regret_or_utility: Callable[[Action], float],
+        *args,
+        **kwargs,
     ):
-        raise NotImplementedError(
-            f"method '{self.observe_regret.__name__}' is not implemented."
-        )
+        self._observe(iteration, regret_or_utility, *args, **kwargs)
+        self._last_update_time = iteration
+        self._recommendation_computed = False
 
-    @abstractmethod
-    def observe_utility(
-        self, iteration: int, utility: Callable[[Action], float], *args, **kwargs
+    def _observe(
+        self,
+        iteration: int,
+        regret_or_utility: Callable[[Action], float],
+        *args,
+        **kwargs,
     ):
-        raise NotImplementedError(
-            f"method '{self.observe_utility.__name__}' is not implemented."
-        )
+        for action in self.cumulative_quantity.keys():
+            self.cumulative_quantity[action] += regret_or_utility(action)
 
     @abstractmethod
     def _recommend(
@@ -165,53 +183,16 @@ class ExternalRegretMinimizer(ABC):
             f"method '{self._recommend.__name__}' is not implemented."
         )
 
-    def _apply_utility(self):
-        if self._utility_used:
-            avg_utility = sum(self.utility.values()) / len(self.utility)
-            for action, utility in self.utility.items():
-                self.cumulative_regret[action] += utility - avg_utility
-                # reset the action's utility storage
-                self.utility[action] = 0.0
-            # reset the flag
-            self._utility_used = False
-
 
 class RegretMatcher(ExternalRegretMinimizer):
-    def __init__(self, actions: Iterable[Action]):
-        actions = list(actions)
-        uniform_prob = 1.0 / len(actions)
-        super().__init__(actions)
-        self.recommendation = {a: uniform_prob for a in actions}
-
-    def reset(self):
-        super().reset()
-        self._last_update_time = -1
-
-    def observe_regret(
-        self, iteration: int, regret: Callable[[Action], float], *args, **kwargs
-    ):
-        for action in self.cumulative_regret.keys():
-            self.cumulative_regret[action] += regret(action)
-        self._last_update_time = iteration
-        self._recommendation_computed = False
-
     def _recommend(self, *args, **kwargs):
-        self._apply_utility()
-        regret_matching(self.recommendation, self.cumulative_regret)
+        regret_matching(self.recommendation, self.cumulative_quantity)
         self._recommendation_computed = True
 
-    def observe_utility(
-        self, iteration: int, utility: Callable[[Action], float], *args, **kwargs
-    ):
-        for action in self.actions:
-            self.utility[action] += utility(action)
-        self._last_update_time = iteration
-        self._recommendation_computed = False
 
-
-class RegretMatcherPlus(RegretMatcher):
-    def _prepare_recommendation(self):
-        regret_matching_plus(self.recommendation, self.cumulative_regret)
+class RegretMatcherPlus(ExternalRegretMinimizer):
+    def _recommend(self, *args, **kwargs):
+        regret_matching_plus(self.recommendation, self.cumulative_quantity)
         self._recommendation_computed = True
 
 
@@ -230,7 +211,7 @@ def weights(t: int, alpha: float, beta: float):
     return alpha_weight, beta_weight
 
 
-class RegretMatcherDiscounted(RegretMatcher):
+class RegretMatcherDiscounted(ExternalRegretMinimizer):
     def __init__(self, actions: Iterable[Action], alpha: float, beta: float):
         super().__init__(actions)
         self.alpha = alpha
@@ -238,33 +219,34 @@ class RegretMatcherDiscounted(RegretMatcher):
 
     def _apply_weights(self):
         alpha, beta = weights(self._last_update_time + 1, self.alpha, self.beta)
-        for action, regret in self.cumulative_regret.items():
-            self.cumulative_regret[action] = regret * (alpha if regret > 0 else beta)
+        for action, regret in self.cumulative_quantity.items():
+            self.cumulative_quantity[action] = regret * (alpha if regret > 0 else beta)
 
     def _recommend(self, *args, **kwargs):
         self._apply_weights()
-        super()._recommend(*args, **kwargs)
+        regret_matching(self.recommendation, self.cumulative_quantity)
+        self._recommendation_computed = True
 
 
 class RegretMatcherDiscountedPlus(RegretMatcherDiscounted):
     def _recommend(self, *args, **kwargs):
         self._apply_weights()
-        regret_matching_plus(self.recommendation, self.cumulative_regret)
+        regret_matching_plus(self.recommendation, self.cumulative_quantity)
         self._recommendation_computed = True
 
 
 class RegretMatcherPredictive(RegretMatcher):
     def _recommend(self, iteration, prediction, *args, **kwargs):
         predictive_regret_matching(
-            prediction, self.recommendation, self.cumulative_regret
+            prediction, self.recommendation, self.cumulative_quantity
         )
         self._recommendation_computed = True
 
 
 class RegretMatcherPredictivePlus(RegretMatcher):
-    def _prepare_recommendation(self, iteration, prediction, *args, **kwargs):
+    def _recommend(self, iteration, prediction, *args, **kwargs):
         predictive_regret_matching_plus(
-            prediction, self.recommendation, self.cumulative_regret
+            prediction, self.recommendation, self.cumulative_quantity
         )
         self._recommendation_computed = True
 
@@ -294,43 +276,26 @@ def anytime_hedge_rate(iteration: int, nr_actions: int) -> float:
     float
         the learning rate for the anytime hedge update.
     """
-    return math.exp(math.sqrt(nr_actions / (iteration + 1)))
+    return math.sqrt(nr_actions * 100 / (iteration + 1))
 
 
 class Hedge(ExternalRegretMinimizer):
     def __init__(
         self,
         actions: Iterable[Action],
+        *args,
         learning_rate: Callable[[int, int], float] = anytime_hedge_rate,
+        **kwargs,
     ):
-        super().__init__(actions)
-        # function eta(round, nr_actions) -> learning_rate
+        kwargs.update(dict(regret_mode=False))
+        super().__init__(actions, *args, **kwargs)
+        # function computing the learning rate for the given iteration and nr of actions to consider
         self._learning_rate: Callable[[int, int], float] = learning_rate
-
-    def reset(self):
-        super().reset()
-        self._last_update_time = -1
-
-    def observe_regret(
-        self, iteration: int, regret: Callable[[Action], float], *args, **kwargs
-    ):
-        for action in self.cumulative_regret:
-            self.cumulative_regret[action] += regret(action)
-        self._last_update_time = iteration
-        self._recommendation_computed = False
 
     def _recommend(self, iteration: Optional[int] = None, *args, **kwargs):
         hedge(
             self.recommendation,
-            self.cumulative_regret,
+            self.cumulative_quantity,
             lr=self._learning_rate(iteration, len(self)),
         )
         self._recommendation_computed = True
-
-    def observe_utility(
-        self, iteration: int, utility: Callable[[Action], float], *args, **kwargs
-    ):
-        for action in self.actions:
-            self.utility[action] += utility(action)
-        self._last_update_time = iteration
-        self._recommendation_computed = False

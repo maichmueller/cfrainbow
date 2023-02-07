@@ -13,6 +13,7 @@ from tqdm import tqdm
 from collections import Counter, defaultdict
 from multiprocessing import Pool, cpu_count
 
+import rm
 from main import main
 
 from cfr import *
@@ -55,7 +56,7 @@ def plot_cfr_convergence(
         dash_pattern = matplotlib.rcParams["lines.dashed_pattern"]
         linewidth = 1
         x = np.arange(1, iters_run + 1)
-        fig, ax = plt.subplots(figsize=(8, 10))
+        fig, ax = plt.subplots(figsize=(8, 8))
         manual_legend_handles = []
         for i, (algo, expl_list) in enumerate(algorithm_to_expl_lists):
             max_iters = max(max_iters, len(expl_list))
@@ -202,6 +203,7 @@ def plot_cfr_convergence(
         ax.set_xlabel("Iteration")
         ax.set_ylabel("Exploitability")
         ax.set_yscale("log", base=10)
+        # ax.set_xscale("log", base=10)
         ax.set_title(f"Convergence to Nash Equilibrium in {game_name}")
         manual_legend_handles.extend(ax.get_legend_handles_labels()[0])
         ax.legend(
@@ -237,7 +239,7 @@ if __name__ == "__main__":
     game = "kuhn_poker"
     # game = "leduc_poker"
     rng = np.random.default_rng(0)
-    stochastic_seeds = 100
+    stochastic_seeds = 10
     n_cpu = cpu_count()
     filename = "testdata.pkl"
     if not os.path.exists(os.path.join(".", filename)):
@@ -249,6 +251,7 @@ if __name__ == "__main__":
                         n_iters,
                         {
                             "game_name": game,
+                            "regret_minimizer": rm.RegretMatcher,
                             "alternating": True,
                             "do_print": verbose,
                         },
@@ -258,6 +261,7 @@ if __name__ == "__main__":
                         n_iters,
                         {
                             "game_name": game,
+                            "regret_minimizer": rm.RegretMatcher,
                             "alternating": False,
                             "do_print": verbose,
                         },
@@ -267,6 +271,7 @@ if __name__ == "__main__":
                         n_iters,
                         {
                             "game_name": game,
+                            "regret_minimizer": rm.RegretMatcher,
                             "alternating": True,
                             "do_print": verbose,
                         },
@@ -276,6 +281,7 @@ if __name__ == "__main__":
                         n_iters,
                         {
                             "game_name": game,
+                            "regret_minimizer": rm.RegretMatcher,
                             "alternating": False,
                             "do_print": verbose,
                         },
@@ -285,6 +291,7 @@ if __name__ == "__main__":
                         n_iters,
                         {
                             "game_name": game,
+                            "regret_minimizer": rm.RegretMatcher,
                             "stochastic_solver": True,
                             "alternating": True,
                             "do_print": verbose,
@@ -295,6 +302,7 @@ if __name__ == "__main__":
                         n_iters,
                         {
                             "game_name": game,
+                            "regret_minimizer": rm.RegretMatcher,
                             "stochastic_solver": True,
                             "alternating": False,
                             "do_print": verbose,
@@ -305,6 +313,7 @@ if __name__ == "__main__":
                         n_iters,
                         {
                             "game_name": game,
+                            "regret_minimizer": rm.RegretMatcher,
                             "stochastic_solver": True,
                             "weighting_mode": 2,
                             "alternating": True,
@@ -316,6 +325,7 @@ if __name__ == "__main__":
                         n_iters,
                         {
                             "game_name": game,
+                            "regret_minimizer": rm.RegretMatcher,
                             "stochastic_solver": True,
                             "weighting_mode": 2,
                             "alternating": False,
@@ -327,6 +337,7 @@ if __name__ == "__main__":
                         n_iters,
                         {
                             "game_name": game,
+                            "regret_minimizer": rm.RegretMatcher,
                             "stochastic_solver": True,
                             "alternating": True,
                             "do_print": verbose,
@@ -337,6 +348,7 @@ if __name__ == "__main__":
                         n_iters,
                         {
                             "game_name": game,
+                            "regret_minimizer": rm.RegretMatcher,
                             "stochastic_solver": True,
                             "alternating": True,
                             "do_print": verbose,
@@ -347,6 +359,7 @@ if __name__ == "__main__":
                         n_iters,
                         {
                             "game_name": game,
+                            "regret_minimizer": rm.RegretMatcher,
                             "stochastic_solver": True,
                             "alternating": False,
                             "do_print": verbose,
@@ -355,13 +368,15 @@ if __name__ == "__main__":
                     "CFR+ (A)": (
                         CFRPlus,
                         n_iters,
-                        {"game_name": game, "do_print": verbose},
+                        {"game_name": game,
+                            "regret_minimizer": rm.RegretMatcherPlus, "do_print": verbose},
                     ),
                     "Disc. CFR (A)": (
                         DiscountedCFR,
                         n_iters,
                         {
                             "game_name": game,
+                            "regret_minimizer": rm.RegretMatcherDiscounted,
                             "alternating": True,
                             "do_print": verbose,
                         },
@@ -371,6 +386,7 @@ if __name__ == "__main__":
                         n_iters,
                         {
                             "game_name": game,
+                            "regret_minimizer": rm.RegretMatcherDiscounted,
                             "alternating": False,
                             "do_print": verbose,
                         },
@@ -381,7 +397,7 @@ if __name__ == "__main__":
                         {
                             "game_name": game,
                             "alternating": True,
-                            "do_regret_matching_plus": True,
+                            "regret_minimizer": rm.RegretMatcherDiscountedPlus,
                             "do_print": verbose,
                         },
                     ),
@@ -391,7 +407,7 @@ if __name__ == "__main__":
                         {
                             "game_name": game,
                             "alternating": False,
-                            "do_regret_matching_plus": True,
+                            "regret_minimizer": rm.RegretMatcherDiscountedPlus,
                             "do_print": verbose,
                         },
                     ),
@@ -400,6 +416,7 @@ if __name__ == "__main__":
                         n_iters,
                         {
                             "game_name": game,
+                            "regret_minimizer": rm.RegretMatcherDiscounted,
                             "alternating": True,
                             "do_print": verbose,
                         },
@@ -409,6 +426,7 @@ if __name__ == "__main__":
                         n_iters,
                         {
                             "game_name": game,
+                            "regret_minimizer": rm.RegretMatcherDiscounted,
                             "alternating": False,
                             "do_print": verbose,
                         },
@@ -418,8 +436,8 @@ if __name__ == "__main__":
                         n_iters,
                         {
                             "game_name": game,
+                            "regret_minimizer": rm.RegretMatcherDiscountedPlus,
                             "alternating": True,
-                            "do_regret_matching_plus": True,
                             "do_print": verbose,
                         },
                     ),
@@ -428,8 +446,8 @@ if __name__ == "__main__":
                         n_iters,
                         {
                             "game_name": game,
+                            "regret_minimizer": rm.RegretMatcherDiscountedPlus,
                             "alternating": False,
-                            "do_regret_matching_plus": True,
                             "do_print": verbose,
                         },
                     ),

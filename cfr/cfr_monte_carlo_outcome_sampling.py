@@ -24,7 +24,7 @@ class OutcomeSamplingMCCFR(CFRBase):
     def __init__(
         self,
         *args,
-        weighting_mode: OutcomeSamplingWeightingMode,
+        weighting_mode: OutcomeSamplingWeightingMode = OutcomeSamplingWeightingMode.stochastic,
         epsilon: float = 0.6,
         **kwargs
     ):
@@ -137,7 +137,7 @@ class OutcomeSamplingMCCFR(CFRBase):
             cf_value_weight = action_value[curr_player] * counterfactual_reach_prob(
                 reach_prob, curr_player
             )
-            regret_minimizer.observe_regret(
+            regret_minimizer.observe(
                 self.iteration,
                 lambda action: (
                     cf_value_weight

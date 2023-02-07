@@ -49,10 +49,11 @@ class ExponentialCFR(CFRBase):
         self,
         traversing_player: Optional[Player] = None,
     ):
+        traversing_player = self._cycle_updating_player(traversing_player)
         self._traverse(
             self.root_state.clone(),
             reach_prob={player: 1.0 for player in [-1] + self.players},
-            traversing_player=self._cycle_updating_player(traversing_player),
+            traversing_player=traversing_player,
         )
         self._apply_exponential_weight(traversing_player)
         self._iteration += 1
@@ -177,7 +178,7 @@ class ExponentialCFR(CFRBase):
                     policy_numerator[action] += policy_weight * player_policy[action]
                     policy_denominator[action] += policy_weight
 
-                regret_minimizer.observe_regret(
+                regret_minimizer.observe(
                     self.iteration, lambda a: exp_l1_weights[a] * regret_incrs[a]
                 )
                 # delete the content of the temporary regret incr table

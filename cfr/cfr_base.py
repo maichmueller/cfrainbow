@@ -130,7 +130,7 @@ class CFRBase:
     def _alternating_update_msg(self):
         divisor, remainder = divmod(self.iteration, self.nr_players)
         # '[iteration] [player] / [nr_players]' to highlight which player of this update cycle is currently updated
-        return f"{divisor} {(remainder + 1)}/{self.nr_players}"
+        return f"{self.iteration} [{divisor} | {(remainder + 1)}/{self.nr_players}]"
 
     def _action_value_map(self, infostate: Optional[Infostate] = None):
         return dict()

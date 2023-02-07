@@ -89,7 +89,7 @@ class PureCFR(CFRBase):
                 )
             state_value = action_values[sampled_action]
             player_state_value = state_value[curr_player]
-            regret_minimizer.observe_regret(
+            regret_minimizer.observe(
                 self.iteration,
                 lambda a: prob_weight
                 * (action_values[a][curr_player] - player_state_value),
