@@ -10,7 +10,7 @@ from typing import (
 
 from numba import njit
 
-from src.cfrainbow.spiel_types import *
+from ..spiel_types import *
 
 
 def normalize_or_uniformize_policy(policy, pos_regret_dict, pos_regret_sum):

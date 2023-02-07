@@ -9,3 +9,5 @@ wandb/
 *.png
 
 *.pkl
+
+poetry.lock

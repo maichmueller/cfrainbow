@@ -44,7 +44,8 @@ numpy = [
     { version = ">=1.22", python = ">=3.10" },
     { version = ">=1.19", python = "<=3.9" }
 ]
-openspiel = { version = ">=1.0" }
+open_spiel = { version = ">=1.0" }
+numba = { version = ">=0.5" }
 
 [tool.poetry.group.dev.dependencies]
 pytest = "*"
