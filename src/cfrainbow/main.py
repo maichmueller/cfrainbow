@@ -5,10 +5,10 @@ import pyspiel
 from open_spiel.python.algorithms import exploitability
 from tqdm import tqdm
 
-import cfr
-import rm
+import cfrainbow.cfr as cfr
+import cfrainbow.rm as rm
 
-from utils import (
+from .utils import (
     all_states_gen,
     print_final_policy_profile,
     print_kuhn_poker_policy_profile,

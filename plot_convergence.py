@@ -15,6 +15,7 @@ from multiprocessing import Pool, cpu_count
 
 from cfrainbow import rm
 from cfrainbow.main import main
+from cfrainbow.cfr import *
 
 
 def plot_cfr_convergence(
