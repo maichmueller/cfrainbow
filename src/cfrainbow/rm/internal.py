@@ -8,8 +8,8 @@ from typing import (
 
 import numpy as np
 
-from src.cfrainbow.spiel_types import *
-from src.cfrainbow.utils import slice_kwargs
+from cfrainbow.spiel_types import *
+from cfrainbow.utils import slice_kwargs
 from .external import ExternalRegretMinimizer
 
 

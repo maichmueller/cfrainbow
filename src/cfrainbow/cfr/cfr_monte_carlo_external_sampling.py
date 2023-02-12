@@ -3,26 +3,26 @@ from typing import Optional
 
 import pyspiel
 
-from src.cfrainbow.utils import sample_on_policy
+from cfrainbow.utils import sample_on_policy
 from .cfr_base import CFRBase, iterate_logging
 
 
 class ExternalSamplingMCCFR(CFRBase):
     @iterate_logging
-    def iterate(self, traversing_player: Optional[int] = None):
+    def iterate(self, updating_player: Optional[int] = None):
         value = self._traverse(
             deepcopy(self.root_state),
-            traversing_player=self._cycle_updating_player(traversing_player),
+            updating_player=self._cycle_updating_player(updating_player),
         )
         self._iteration += 1
         return value
 
-    def _traverse(self, state: pyspiel.State, traversing_player: int = 0):
+    def _traverse(self, state: pyspiel.State, updating_player: int = 0):
         self._nodes_touched += 1
 
         current_player = state.current_player()
         if state.is_terminal():
-            reward = state.player_return(traversing_player)
+            reward = state.player_return(updating_player)
             return reward
 
         if state.is_chance_node():
@@ -30,7 +30,7 @@ class ExternalSamplingMCCFR(CFRBase):
             outcome, outcome_prob = self.rng.choice(outcomes)
             state.apply_action(int(outcome))
 
-            return self._traverse(state, traversing_player)
+            return self._traverse(state, updating_player)
 
         curr_player = state.current_player()
         infostate = state.information_state_string(curr_player)
@@ -39,13 +39,13 @@ class ExternalSamplingMCCFR(CFRBase):
         regret_minimizer = self.regret_minimizer(infostate)
         player_policy = regret_minimizer.recommend(self.iteration)
 
-        if traversing_player == current_player:
+        if updating_player == current_player:
             state_value = 0.0
             action_values = dict()
 
             for action in actions:
                 action_values[action] = self._traverse(
-                    state.child(action), traversing_player
+                    state.child(action), updating_player
                 )
                 state_value += player_policy[action] * action_values[action]
 
@@ -60,7 +60,7 @@ class ExternalSamplingMCCFR(CFRBase):
                 rng=self.rng,
             )
             state.apply_action(sampled_action)
-            action_value = self._traverse(state, traversing_player)
+            action_value = self._traverse(state, updating_player)
 
             if current_player == self._peek_at_next_updating_player():
                 avg_policy = self._avg_policy_at(current_player, infostate)

@@ -34,3 +34,39 @@ class DiscountedCFR(CFRVanilla):
         for action in player_policy.keys():
             player_policy[action] *= gamma_weight
         return player_policy
+
+
+class LinearCFR(DiscountedCFR):
+    def __init__(self, *args, **kwargs):
+        kwargs.update(
+            dict(
+                alpha=1.0,
+                beta=1.0,
+                gamma=1.0,
+            )
+        )
+        super().__init__(*args, **kwargs)
+
+
+class CFRPlus(DiscountedCFR):
+    def __init__(
+        self,
+        root_state: pyspiel.State,
+        regret_minimizer_type: Type[rm.ExternalRegretMinimizer] = rm.RegretMatcherPlus,
+        *args,
+        **kwargs,
+    ):
+        kwargs.update(
+            dict(
+                alternating=True,
+                alpha=float("inf"),
+                beta=-float("inf"),
+                gamma=1.0,
+            )
+        )
+        super().__init__(
+            root_state,
+            regret_minimizer_type,
+            *args,
+            **kwargs,
+        )

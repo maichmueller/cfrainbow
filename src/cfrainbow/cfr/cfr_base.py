@@ -7,7 +7,7 @@ import numpy as np
 import pyspiel
 
 from cfrainbow.rm import ExternalRegretMinimizer
-from src.cfrainbow.spiel_types import Action, Infostate, Probability, Player
+from cfrainbow.spiel_types import Action, Infostate, Probability, Player
 
 
 def iterate_logging(f):
@@ -98,6 +98,13 @@ class CFRBase:
         if infostate not in self._action_set:
             raise KeyError(f"Infostate {infostate} not in action list lookup.")
         return self._action_set[infostate]
+
+    def force_update(self):
+        """
+        Force all regret minimizers to compute the latest recommendation.
+        """
+        for regret_minimizer in self._regret_minimizer_dict.values():
+            regret_minimizer.recommend(self.iteration, force=True)
 
     def _set_action_list(self, infostate: Infostate, state: pyspiel.State):
         if infostate not in self._action_set:

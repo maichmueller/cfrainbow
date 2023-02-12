@@ -1,23 +1,42 @@
 from collections import defaultdict
 from collections.abc import MutableMapping
-from typing import Dict, Sequence, Optional, Mapping
+from copy import deepcopy, copy
+from dataclasses import astuple, dataclass
+from typing import Dict, Sequence, Optional, Type, List, Set
 
-import numpy as np
 import pyspiel
 
+from cfrainbow.rm import ExternalRegretMinimizer, RegretMatcherPredictivePlus
+from cfrainbow.spiel_types import Infostate, Value, Action, Probability, Regret, Player
+from cfrainbow.utils import counterfactual_reach_prob, infostates_gen
+from .cfr_base import iterate_logging
 from .cfr_discounted import DiscountedCFR
-from src.cfrainbow.spiel_types import Infostate, Value, Action
-
-from src.cfrainbow.utils import counterfactual_reach_prob
 
 
-class PredictivePlusCFR(DiscountedCFR):
+@dataclass
+class ActionValues:
+    __slots__ = ["mapping", "cf_reach_probability", "iteration"]
+    mapping: Dict[Action, Value]
+    cf_reach_probability: float
+    iteration: int
+
+
+class GetitemZero:
+    def __getitem__(self, item):
+        return 0.0
+
+
+class PredictiveCFRPlus(DiscountedCFR):
     def __init__(
         self,
+        root_state: pyspiel.State,
+        regret_minimizer_type: Type[
+            ExternalRegretMinimizer
+        ] = RegretMatcherPredictivePlus,
         *args,
         alpha=float("inf"),
         beta=-float("inf"),
-        gamma=2,
+        gamma=1,
         **kwargs,
     ):
         kwargs.update(
@@ -26,57 +45,105 @@ class PredictivePlusCFR(DiscountedCFR):
                 alternating=True,
             )
         )
-        super().__init__(*args, alpha=alpha, beta=beta, gamma=gamma, **kwargs)
-        self._action_values: Dict[
-            Infostate, MutableMapping[Action, Sequence[Value]]
-        ] = defaultdict(dict)
+        super().__init__(
+            root_state,
+            regret_minimizer_type,
+            *args,
+            alpha=alpha,  # depending on regret minimizer may be ignored
+            beta=beta,  # depending on regret minimizer may be ignored
+            gamma=gamma,
+            **kwargs,
+        )
+        self._current_action_values: Dict[Infostate, ActionValues] = defaultdict(
+            lambda: ActionValues(defaultdict(float), 0.0, -1)
+        )
 
-    def _action_value_map(self, infostate: Optional[Infostate] = None):
-        if infostate is None:
-            raise ValueError(
-                "Predictive CFR needs the information state to return the correct action value map."
-            )
-        av = self._action_values[infostate]
-        # reset the action values found previously
-        new_entries = {a: np.zeros(self.nr_players) for a in av}
-        av.clear()
-        av.update(new_entries)
-        return av
+        self._prev_action_values: Dict[Infostate, ActionValues] = defaultdict(
+            lambda: ActionValues(defaultdict(float), 0.0, -1)
+        )
 
-    def _set_action_list(self, infostate: Infostate, state: pyspiel.State):
-        if infostate not in self._action_set:
-            actions = state.legal_actions()
-            self._action_set[infostate] = actions
-            av = self._action_values[infostate]
-            for action in actions:
-                av[action] = np.zeros(self.nr_players)
+        self.infostates = {player: set() for player in self.players}
+        for infostate, player, state, _ in infostates_gen(root=self.root_state.clone()):
+            self.infostates[player].add(infostate)
 
-    def value_prediction(
+    def _move_curr_to_prev(self, updating_player):
+        for infostate in self.infostates[updating_player]:
+            # print("Forcing the update on infostate", infostate)
+            # self.regret_minimizer(infostate).recommend(
+            #     self.iteration, prediction=self.utility_prediction(infostate), force=True
+            # )
+            curr_av = self._current_action_values[infostate]
+            curr_av.iteration = self.iteration
+            self._prev_action_values[infostate] = curr_av
+        self._current_action_values.clear()
+
+    @iterate_logging
+    def iterate(
         self,
-        infostate: Infostate,
-        reach_prob: Mapping[int, float],
-        traversing_player: int,
-        *args,
-        **kwargs,
+        updating_player: Optional[int] = None,
     ):
+        updating_player = self._cycle_updating_player(updating_player)
+        self._traverse(
+            self.root_state.clone(),
+            reach_prob_map={player: 1.0 for player in [-1] + self.players},
+            updating_player=updating_player,
+        )
+        self._move_curr_to_prev(updating_player)
+        self._iteration += 1
+
+    def _traverse_player_node(
+        self, state, infostate, reach_prob, updating_player, action_values
+    ):
+        current_player = state.current_player()
+        state_value = [0.0] * self.nr_players
+        av = self._current_action_values[infostate]
+        cf_rp = counterfactual_reach_prob(reach_prob, updating_player)
+        av.cf_reach_probability += cf_rp
+        for action, action_prob in (
+            self.regret_minimizer(infostate)
+            .recommend(self.iteration, prediction=self.utility_prediction(infostate))
+            .items()
+        ):
+            child_reach_prob = deepcopy(reach_prob)
+            child_reach_prob[current_player] *= action_prob
+            next_state = state.child(action)
+
+            child_value = self._traverse(next_state, child_reach_prob, updating_player)
+            action_values[action] = child_value
+
+            for p in self.players:
+                state_value[p] += action_prob * child_value[p]
+            av.mapping[action] += cf_rp * child_value[current_player]
+
+        return state_value
+
+    def utility_prediction(self, infostate: Infostate):
         """Returns the current prediction of next iteration's payoff
 
         Parameters
         ----------
         infostate: Optional[Infostate]
             the infostate at which to predict future payoffs
-        reach_prob: Optional[Mapping[int, float]]
-            the reach probabilities for each player to this node
-        traversing_player: int
-            the player that currently traverses the tree
 
         Returns
         -------
         Dict[Action, float]
             the action value predictions for the next turns.
         """
-        cf_rp = counterfactual_reach_prob(reach_prob, traversing_player)
-        return {
-            action: cf_rp * value[traversing_player]
-            for action, value in self._action_values[infostate].items()
-        }
+        # if (self.iteration - self.nr_players) < 0:
+        #     return GetitemZero()
+
+        return self._prev_action_values[infostate].mapping
+        # av = self._prev_action_values[infostate]
+        # print(
+        #     "iteration",
+        #     self.iteration,
+        #     "fetches prediction from iteration",
+        #     av.iteration,
+        # )
+        # return av.mapping
+        # return {
+        #     action: value / (av.cf_reach_probability + 1e-32)
+        #     # action: value
+        #     for action, value in av.mapping.items()
+        # }

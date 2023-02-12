@@ -2,24 +2,24 @@ from copy import deepcopy
 from typing import Dict, Mapping, Optional, Sequence
 
 from .cfr_base import CFRBase, iterate_logging
-from src.cfrainbow.spiel_types import Action, Infostate, Probability, Value
+from cfrainbow.spiel_types import Action, Infostate, Probability, Value
 
 from cfrainbow.rm import ExternalRegretMinimizer
 import pyspiel
 
-from src.cfrainbow.utils import counterfactual_reach_prob
+from cfrainbow.utils import counterfactual_reach_prob
 
 
 class CFRVanilla(CFRBase):
     @iterate_logging
     def iterate(
         self,
-        traversing_player: Optional[int] = None,
+        updating_player: Optional[int] = None,
     ):
         self._traverse(
             self.root_state.clone(),
             reach_prob_map={player: 1.0 for player in [-1] + self.players},
-            traversing_player=self._cycle_updating_player(traversing_player),
+            updating_player=self._cycle_updating_player(updating_player),
         )
         self._iteration += 1
 
@@ -27,7 +27,7 @@ class CFRVanilla(CFRBase):
         self,
         state: pyspiel.State,
         reach_prob_map: dict[Action, Probability],
-        traversing_player: Optional[int] = None,
+        updating_player: Optional[int] = None,
     ):
         self._nodes_touched += 1
 
@@ -35,16 +35,16 @@ class CFRVanilla(CFRBase):
             return state.returns()
 
         if state.is_chance_node():
-            return self._traverse_chance_node(state, reach_prob_map, traversing_player)
+            return self._traverse_chance_node(state, reach_prob_map, updating_player)
         else:
             curr_player = state.current_player()
             infostate = state.information_state_string(curr_player)
             self._set_action_list(infostate, state)
             action_values = self._action_value_map(infostate)
             state_value = self._traverse_player_node(
-                state, infostate, reach_prob_map, traversing_player, action_values
+                state, infostate, reach_prob_map, updating_player, action_values
             )
-            if self.simultaneous or traversing_player == curr_player:
+            if self.simultaneous or updating_player == curr_player:
                 regret_minimizer = self.regret_minimizer(infostate)
                 self._update_regret(
                     regret_minimizer,
@@ -80,14 +80,9 @@ class CFRVanilla(CFRBase):
         current_player = state.current_player()
         state_value = [0.0] * self.nr_players
 
-        regret_minimizer = self.regret_minimizer(infostate)
-        current_policy = regret_minimizer.recommend(
-            self.iteration,
-            # prediction is ignored for non-predicting regret minimizers
-            prediction=self.value_prediction(infostate, reach_prob, updating_player),
-        )
-
-        for action, action_prob in current_policy.items():
+        for action, action_prob in (
+            self.regret_minimizer(infostate).recommend(self.iteration).items()
+        ):
             child_reach_prob = deepcopy(reach_prob)
             child_reach_prob[current_player] *= action_prob
             next_state = state.child(action)
@@ -127,29 +122,3 @@ class CFRVanilla(CFRBase):
         avg_policy = self._avg_policy_at(curr_player, infostate)
         for action, curr_policy_prob in curr_policy.items():
             avg_policy[action] += player_reach_prob * curr_policy_prob
-
-    def value_prediction(
-        self,
-        infostate: Optional[Infostate],
-        reach_prob: Optional[Mapping[int, float]],
-        traversing_player: Optional[int],
-        *args,
-        **kwargs
-    ):
-        """Method to override in predictive subclasses
-
-        Parameters
-        ----------
-        infostate: Optional[Infostate]
-            the infostate at which to predict future payoffs
-        reach_prob: Optional[Mapping[int, float]]
-            the reach probabilities for each player to this node
-        traversing_player: int
-            the player that currently traverses the tree
-
-        Returns
-        -------
-        None
-            the base vanilla cfr method is not predictive.
-        """
-        return None

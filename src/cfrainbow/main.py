@@ -8,7 +8,7 @@ from tqdm import tqdm
 import cfrainbow.cfr as cfr
 import cfrainbow.rm as rm
 
-from .utils import (
+from cfrainbow.utils import (
     all_states_gen,
     print_final_policy_profile,
     print_kuhn_poker_policy_profile,
@@ -83,7 +83,8 @@ def main(
             ):
                 print(
                     f"-------------------------------------------------------------"
-                    f"--> Exploitability {expl_values[-1]: .5f}"
+                    f"--> Exploitability "
+                    f"{f'{expl_values[-1]: .5f}' if expl_values[-1] > 1e-5 else f'{expl_values[-1]: .3E}'}"
                 )
                 if game_name == "kuhn_poker":
                     print_kuhn_poker_policy_profile(
@@ -96,7 +97,10 @@ def main(
             if expl_threshold is not None and expl_values[-1] < expl_threshold:
                 print(f"Exploitability threshold of {expl_threshold} reached.")
                 break
-
+    print(
+        "\n---------------------------------------------------------------> Final Exploitability:",
+        expl_values[-1],
+    )
     avg_policy = solver.average_policy()
     if (
         (do_print or only_final_expl_print)
@@ -109,17 +113,17 @@ def main(
 
 
 if __name__ == "__main__":
-    # n_iters = 10000
-    n_iters = int(1e10)
-    for minimizer in (rm.RegretMatcher,):
+    n_iters = 10000
+    # n_iters = int(1e10)
+    for minimizer in (rm.RegretMatcherPredictivePlus,):
         main(
-            cfr.ExponentialCFR,
+            cfr.PredictiveCFRPlus,
             n_iters,
             regret_minimizer=minimizer,
             alternating=True,
             do_print=False,
-            tqdm_print=True,
+            tqdm_print=False,
             only_final_expl_print=False,
-            expl_threshold=1e-3,
+            expl_threshold=1e-7,
             seed=0,
         )

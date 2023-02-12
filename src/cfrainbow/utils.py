@@ -110,7 +110,7 @@ def infostates_gen(
         curr_player = state.current_player()
         yield state.information_state_string(
             curr_player
-        ), curr_player, state.legal_actions(), d
+        ), curr_player, state, d
 
 
 class KuhnTensorToStr:

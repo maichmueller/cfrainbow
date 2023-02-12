@@ -5,8 +5,8 @@ from typing import Optional, Dict, Mapping
 
 import pyspiel
 
-from src.cfrainbow.spiel_types import Action, Infostate, Probability, JointNormalFormPlan
-from src.cfrainbow.utils import sample_on_policy, counterfactual_reach_prob
+from cfrainbow.spiel_types import Action, Infostate, Probability, JointNormalFormPlan
+from cfrainbow.utils import sample_on_policy, counterfactual_reach_prob
 from .cfr_base import iterate_logging
 from .cfr_pure import PureCFR
 
@@ -36,7 +36,7 @@ class SamplingCFR(PureCFR):
     @iterate_logging
     def iterate(
         self,
-        traversing_player: Optional[int] = None,
+        updating_player: Optional[int] = None,
     ):
         # empty the previously sampled strategy profile
         for plan in self.plan:
@@ -45,7 +45,7 @@ class SamplingCFR(PureCFR):
         self._traverse(
             self.root_state.clone(),
             reach_prob={player: 1.0 for player in [-1] + self.players},
-            traversing_player=self._cycle_updating_player(traversing_player),
+            updating_player=self._cycle_updating_player(updating_player),
         )
         self.empirical_sum_of_play[
             JointNormalFormPlan(
@@ -58,7 +58,7 @@ class SamplingCFR(PureCFR):
         self,
         state: pyspiel.State,
         reach_prob: Optional[Dict[int, Probability]] = None,
-        traversing_player: Optional[int] = None,
+        updating_player: Optional[int] = None,
     ):
         self._nodes_touched += 1
 
@@ -66,7 +66,7 @@ class SamplingCFR(PureCFR):
             return state.returns()
 
         if state.is_chance_node():
-            return self._traverse_chance_node(state, reach_prob, traversing_player)
+            return self._traverse_chance_node(state, reach_prob, updating_player)
 
         curr_player = state.current_player()
         infostate = state.information_state_string(curr_player)
@@ -90,7 +90,7 @@ class SamplingCFR(PureCFR):
             action_values[action] = self._traverse(
                 state.child(action),
                 child_reach_prob,
-                traversing_player,
+                updating_player,
             )
         state_value = action_values[sampled_action]
         player_state_value = state_value[curr_player]

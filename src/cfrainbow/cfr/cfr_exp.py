@@ -7,8 +7,8 @@ import numpy as np
 from .cfr_base import CFRBase, iterate_logging
 import pyspiel
 
-from src.cfrainbow.utils import counterfactual_reach_prob
-from src.cfrainbow.spiel_types import Action, Infostate, Probability, Regret, Player
+from cfrainbow.utils import counterfactual_reach_prob
+from cfrainbow.spiel_types import Action, Infostate, Probability, Regret, Player
 
 
 class ExponentialCFR(CFRBase):
@@ -46,22 +46,22 @@ class ExponentialCFR(CFRBase):
     @iterate_logging
     def iterate(
         self,
-        traversing_player: Optional[Player] = None,
+        updating_player: Optional[Player] = None,
     ):
-        traversing_player = self._cycle_updating_player(traversing_player)
+        updating_player = self._cycle_updating_player(updating_player)
         self._traverse(
             self.root_state.clone(),
             reach_prob={player: 1.0 for player in [-1] + self.players},
-            traversing_player=traversing_player,
+            updating_player=updating_player,
         )
-        self._apply_exponential_weight(traversing_player)
+        self._apply_exponential_weight(updating_player)
         self._iteration += 1
 
     def _traverse(
         self,
         state: pyspiel.State,
         reach_prob: dict[Action, Probability],
-        traversing_player: Optional[Player] = None,
+        updating_player: Optional[Player] = None,
     ):
         self._nodes_touched += 1
 
@@ -74,7 +74,7 @@ class ExponentialCFR(CFRBase):
 
         if state.is_chance_node():
             return self._traverse_chance_node(
-                state, reach_prob, traversing_player, action_values, state_value
+                state, reach_prob, updating_player, action_values, state_value
             )
 
         else:
@@ -85,14 +85,14 @@ class ExponentialCFR(CFRBase):
             state_value = self._traverse_player_node(
                 state,
                 reach_prob,
-                traversing_player,
+                updating_player,
                 infostate,
                 curr_player,
                 action_values,
                 state_value,
             )
 
-            if self.simultaneous or traversing_player == curr_player:
+            if self.simultaneous or updating_player == curr_player:
                 cf_reach_prob = counterfactual_reach_prob(reach_prob, curr_player)
                 regrets = self._regret_increments_of(curr_player, infostate)
                 for action, action_value in action_values.items():
@@ -109,8 +109,7 @@ class ExponentialCFR(CFRBase):
     def _regret_increments_of(self, curr_player, infostate):
         if infostate not in (regret_table := self._regret_increments[curr_player]):
             regret_table[infostate] = {a: 0.0 for a in self.action_list(infostate)}
-        regrets = regret_table[infostate]
-        return regrets
+        return regret_table[infostate]
 
     def _traverse_player_node(
         self,
@@ -158,7 +157,6 @@ class ExponentialCFR(CFRBase):
             else [(updating_player, self._regret_increments[updating_player])]
         ):
             for infostate, regret_incrs in player_regret_incrs.items():
-                avg_regret = sum(regret_incrs.values()) / len(regret_incrs)
                 regret_minimizer = self.regret_minimizer(infostate)
                 player_policy = regret_minimizer.recommend(self.iteration)
                 policy_numerator = self._avg_policy_at(
@@ -168,6 +166,8 @@ class ExponentialCFR(CFRBase):
                     player, infostate, numerator=False
                 )
                 reach_prob = self._reach_prob[infostate]
+
+                avg_regret = sum(regret_incrs.values()) / len(regret_incrs)
                 exp_l1_weights = dict()
                 for action, regret_incr in regret_incrs.items():
                     exp_l1 = np.exp(regret_incr - avg_regret)

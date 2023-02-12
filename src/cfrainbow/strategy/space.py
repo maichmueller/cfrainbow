@@ -17,7 +17,7 @@ import numpy as np
 import pyspiel
 from tqdm import tqdm
 
-from src.cfrainbow.spiel_types import (
+from cfrainbow.spiel_types import (
     Infostate,
     Action,
     NormalFormPlan,
@@ -27,7 +27,7 @@ from src.cfrainbow.spiel_types import (
     JointNormalFormPlan,
     JointNormalFormStrategy,
 )
-from src.cfrainbow.utils import all_states_gen, normalize_state_policy
+from cfrainbow.utils import all_states_gen, normalize_state_policy
 
 
 class DepthInformedSequence(NamedTuple):

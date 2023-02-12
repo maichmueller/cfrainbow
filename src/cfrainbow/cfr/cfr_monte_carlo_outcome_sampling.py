@@ -6,8 +6,8 @@ from typing import Optional, Dict
 import numpy as np
 import pyspiel
 
-from src.cfrainbow.spiel_types import Probability, Action
-from src.cfrainbow.utils import (
+from cfrainbow.spiel_types import Probability, Action
+from cfrainbow.utils import (
     counterfactual_reach_prob,
     sample_on_policy,
 )
@@ -42,12 +42,12 @@ class OutcomeSamplingMCCFR(CFRBase):
     @iterate_logging
     def iterate(
         self,
-        traversing_player: Optional[int] = None,
+        updating_player: Optional[int] = None,
     ):
         value, tail_prob = self._traverse(
             deepcopy(self.root_state),
             reach_prob={player: 1.0 for player in [-1] + self.players},
-            traversing_player=self._cycle_updating_player(traversing_player),
+            updating_player=self._cycle_updating_player(updating_player),
             sample_probability=1.0,
             weights={player: 0.0 for player in self.players}
             if self.weighting_mode == OutcomeSamplingWeightingMode.lazy
@@ -60,7 +60,7 @@ class OutcomeSamplingMCCFR(CFRBase):
         self,
         state: pyspiel.State,
         reach_prob: dict[int, float],
-        traversing_player: Optional[int] = None,
+        updating_player: Optional[int] = None,
         sample_probability=1.0,
         weights: Optional[dict[int, float]] = None,
     ):
@@ -87,7 +87,7 @@ class OutcomeSamplingMCCFR(CFRBase):
             return self._traverse(
                 state,
                 reach_prob,
-                traversing_player,
+                updating_player,
                 sample_probability * sample_prob,
                 weights=weights,
             )
@@ -102,7 +102,7 @@ class OutcomeSamplingMCCFR(CFRBase):
             sampled_action,
             sampled_action_prob,
             sampled_action_sample_prob,
-        ) = self._sample_action(curr_player, traversing_player, player_policy)
+        ) = self._sample_action(curr_player, updating_player, player_policy)
 
         child_reach_prob = deepcopy(reach_prob)
         child_reach_prob[curr_player] *= sampled_action_prob
@@ -117,7 +117,7 @@ class OutcomeSamplingMCCFR(CFRBase):
         action_value, tail_prob = self._traverse(
             state,
             child_reach_prob,
-            traversing_player,
+            updating_player,
             sample_probability * sampled_action_sample_prob,
             weights=next_weights,
         )
@@ -133,7 +133,7 @@ class OutcomeSamplingMCCFR(CFRBase):
                 weights,
             )
 
-        if self.simultaneous or traversing_player == curr_player:
+        if self.simultaneous or updating_player == curr_player:
             cf_value_weight = action_value[curr_player] * counterfactual_reach_prob(
                 reach_prob, curr_player
             )

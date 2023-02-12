@@ -2,13 +2,13 @@ import itertools
 from collections import defaultdict
 from typing import Optional, Dict, Mapping, List
 
-from src.cfrainbow.spiel_types import NormalFormPlan, JointNormalFormPlan
+from cfrainbow.spiel_types import NormalFormPlan, JointNormalFormPlan
 from cfrainbow.strategy import (
     reachable_terminal_states,
     reduced_nf_space,
     behaviour_to_nf_strategy,
 )
-from src.cfrainbow.utils import infostates_gen
+from cfrainbow.utils import infostates_gen
 from .cfr_vanilla import CFRVanilla
 
 
@@ -49,10 +49,10 @@ class CFRJointReconstruction(CFRVanilla):
 
     def iterate(
         self,
-        traversing_player: Optional[int] = None,
+        updating_player: Optional[int] = None,
     ):
         # first let vanilla cfr run its course
-        super().iterate(traversing_player)
+        super().iterate(updating_player)
         # the parent class will also increment the iteration counter which signals the regret minimizers
         # to update the current strategy on the next demand, i.e. in the following
 

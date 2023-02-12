@@ -6,8 +6,8 @@ from . import PureCFR
 from .cfr_base import iterate_logging
 import pyspiel
 
-from src.cfrainbow.utils import sample_on_policy, counterfactual_reach_prob
-from src.cfrainbow.spiel_types import Action, Infostate, Probability
+from cfrainbow.utils import sample_on_policy, counterfactual_reach_prob
+from cfrainbow.spiel_types import Action, Infostate, Probability
 
 
 class InternalCFR(PureCFR):
@@ -30,7 +30,7 @@ class InternalCFR(PureCFR):
     @iterate_logging
     def iterate(
         self,
-        traversing_player: Optional[int] = None,
+        updating_player: Optional[int] = None,
     ):
         # empty the previously sampled strategy
         self.plan.clear()
@@ -42,7 +42,7 @@ class InternalCFR(PureCFR):
                 if self.simultaneous
                 else None
             ),
-            traversing_player=self._cycle_updating_player(traversing_player),
+            updating_player=self._cycle_updating_player(updating_player),
         )
         self._iteration += 1
 
@@ -50,13 +50,13 @@ class InternalCFR(PureCFR):
         self,
         state: pyspiel.State,
         reach_prob: Optional[Dict[int, Probability]] = None,
-        traversing_player: Optional[int] = None,
+        updating_player: Optional[int] = None,
     ):
         if state.is_terminal():
             return state.returns()
 
         if state.is_chance_node():
-            return self._traverse_chance_node(state, reach_prob, traversing_player)
+            return self._traverse_chance_node(state, reach_prob, updating_player)
 
         curr_player = state.current_player()
         infostate = state.information_state_string(curr_player)
@@ -67,7 +67,7 @@ class InternalCFR(PureCFR):
 
         sampled_action = self._sample_action(infostate, player_policy)
 
-        if self.simultaneous or curr_player == traversing_player:
+        if self.simultaneous or curr_player == updating_player:
 
             if self.simultaneous:
                 # increment the average policy for the player
@@ -92,7 +92,7 @@ class InternalCFR(PureCFR):
                 action_values[action] = self._traverse(
                     state.child(action),
                     child_reach_prob,
-                    traversing_player,
+                    updating_player,
                 )
             state_value = action_values[sampled_action]
             player_state_value = state_value[curr_player]
@@ -105,7 +105,7 @@ class InternalCFR(PureCFR):
             if curr_player == self._peek_at_next_updating_player():
                 self._avg_policy_at(curr_player, infostate)[sampled_action] += 1
             state.apply_action(sampled_action)
-            state_value = self._traverse(state, reach_prob, traversing_player)
+            state_value = self._traverse(state, reach_prob, updating_player)
 
         return state_value
 
