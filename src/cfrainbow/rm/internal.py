@@ -33,14 +33,10 @@ class InternalRegretMinimizer(ABC):
         return self._last_update_time
 
     def reset(self):
+        self._reset()
         self.recommendation.clear()
         self._recommendation_computed = False
-
-    @abstractmethod
-    def regret(self, action_from: Action, action_to: Action):
-        raise NotImplementedError(
-            f"method '{self.regret.__name__}' is not implemented."
-        )
+        self._last_update_time: int = -1
 
     def recommend(self, iteration: int, *args, force: bool = False, **kwargs):
         if force or (
@@ -52,6 +48,10 @@ class InternalRegretMinimizer(ABC):
         return self.recommendation
 
     @abstractmethod
+    def _reset(self, *args, **kwargs):
+        pass
+
+    @abstractmethod
     def _recommend(
         self, iteration: Optional[int] = None, *args, **kwargs
     ) -> Dict[Action, Probability]:
@@ -60,19 +60,15 @@ class InternalRegretMinimizer(ABC):
         )
 
     @abstractmethod
-    def observe_regret(
-        self, iteration: int, regret: Callable[[Action], float], *args, **kwargs
+    def observe(
+        self,
+        iteration: int,
+        utility: Callable[[Action, Action], float],
+        *args,
+        **kwargs,
     ):
         raise NotImplementedError(
-            f"method '{self.observe_regret.__name__}' is not implemented."
-        )
-
-    @abstractmethod
-    def observe_utility(
-        self, iteration: int, utility: Callable[[Action], float], *args, **kwargs
-    ):
-        raise NotImplementedError(
-            f"method '{self.observe_utility.__name__}' is not implemented."
+            f"method '{self.observe.__name__}' is not implemented."
         )
 
 
@@ -98,24 +94,33 @@ class InternalFromExternalRegretMinimizer(InternalRegretMinimizer):
 
         self._last_update_time = -1
 
+    def __len__(self):
+        return self._n_actions
+
+    def _reset(self):
+        for erm in self.external_minimizer.values():
+            erm.reset()
+
+    @property
+    def actions(self):
+        return self._actions
+
+    @property
+    def last_update_time(self):
+        return self._last_update_time
+
+    @property
+    def regret_mode(self):
+        return self.external_minimizer[self.actions[0]].regret_mode
+
     def reset(self):
         for minimizer in self.external_minimizer.values():
             minimizer.reset()
         self.recommendation.clear()
         self._recommendation_computed = False
+        self._last_update_time: int = -1
 
-    def regret(self, action_from: Action, action_to: Action):
-        return self.external_minimizer[action_from].regret(action_to)
-
-    def observe_regret(
-        self, iteration: int, regret: Callable[[Action, Action], float], *args, **kwargs
-    ):
-        for assigned_action, erm in self.external_minimizer.items():
-            erm.observe(iteration, lambda a: regret(assigned_action, a))
-        self._last_update_time = iteration
-        self._recommendation_computed = False
-
-    def observe_utility(
+    def observe(
         self, iteration: int, utility: Callable[[Action], float], *args, **kwargs
     ):
         for assigned_action, erm in self.external_minimizer.items():

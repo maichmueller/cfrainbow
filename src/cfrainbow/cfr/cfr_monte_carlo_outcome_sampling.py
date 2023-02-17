@@ -1,7 +1,7 @@
 from collections import defaultdict
 from copy import deepcopy, copy
 from enum import Enum
-from typing import Optional, Dict
+from typing import Optional, Dict, Sequence
 
 import pyspiel
 
@@ -25,17 +25,21 @@ class OutcomeSamplingMCCFR(CFRBase):
         *args,
         weighting_mode: OutcomeSamplingWeightingMode = OutcomeSamplingWeightingMode.stochastic,
         epsilon: float = 0.6,
-        **kwargs
+        **kwargs,
     ):
         super().__init__(*args, **kwargs)
         self.weighting_mode = OutcomeSamplingWeightingMode(weighting_mode)
-        self.weight_storage: Dict[Infostate, Dict[Player, float]] = dict()
+        self.weight_storage: Dict[Infostate, Dict[Action, float]] = dict()
         self.epsilon = epsilon
         self.last_visit: defaultdict[Infostate, int] = defaultdict(int)
 
-    def _weight(self, infostate):
+    def _weight(self, infostate, actions: Optional[Sequence[Action]] = None):
         if infostate not in self.weight_storage:
-            self.weight_storage[infostate] = [0.0] * self.nr_players
+            assert actions is not None, (
+                "Lazy weight storage has not been previously initialized. "
+                "Call requires the valid action set to be passed as well in this case."
+            )
+            self.weight_storage[infostate] = {action: 0.0 for action in actions}
         return self.weight_storage[infostate]
 
     @iterate_logging
@@ -106,7 +110,9 @@ class OutcomeSamplingMCCFR(CFRBase):
             if self.weighting_mode == OutcomeSamplingWeightingMode.lazy:
                 next_weights[curr_player] = (
                     next_weights[curr_player] * sampled_action_policy_prob
-                    + self._weight(infostate)[sampled_action]
+                    + self._weight(infostate, self.action_list(infostate))[
+                        sampled_action
+                    ]
                 )
 
             state.apply_action(sampled_action)
@@ -119,15 +125,16 @@ class OutcomeSamplingMCCFR(CFRBase):
             )
 
             def avg_policy_update_call():
-                self._update_average_policy(
-                    curr_player,
-                    infostate,
-                    player_policy,
-                    sampled_action,
-                    reach_prob[curr_player],
-                    sample_probability,
-                    weights,
-                )
+                if player_reach_prob := reach_prob[curr_player] != 0.0:
+                    self._update_average_policy(
+                        curr_player,
+                        infostate,
+                        player_policy,
+                        sampled_action,
+                        player_reach_prob,
+                        sample_probability,
+                        weights,
+                    )
 
             def regret_update_call():
                 cf_value_weight = action_value[curr_player] * counterfactual_reach_prob(
@@ -184,13 +191,14 @@ class OutcomeSamplingMCCFR(CFRBase):
                 )
         else:
             # lazy weighting updates
+            stored_weights = self._weight(infostate)
             for action, policy_prob in player_policy.items():
                 policy_incr = (weights[curr_player] + player_reach_prob) * policy_prob
                 avg_policy[action] += policy_incr
                 if action != sampled_action:
-                    weights[curr_player] += policy_incr
+                    stored_weights[action] += policy_incr
                 else:
-                    weights[curr_player] = 0.0
+                    stored_weights[action] = 0.0
 
     def _sample_action(
         self,
@@ -203,7 +211,8 @@ class OutcomeSamplingMCCFR(CFRBase):
             actions,
             [policy[action] for action in actions],
             self.rng,
-            epsilon=self.epsilon
-            * (self.simultaneous or current_player == updating_player),
+            epsilon=(
+                self.epsilon * (self.simultaneous or current_player == updating_player)
+            ),
         )
         return sampled_action, policy[sampled_action], sample_policy[sample_index]

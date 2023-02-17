@@ -1,4 +1,4 @@
-from copy import deepcopy
+from copy import deepcopy, copy
 from typing import Optional, Dict, Mapping
 
 from .cfr_base import CFRBase, iterate_logging
@@ -28,7 +28,7 @@ class PureCFR(CFRBase):
         self._traverse(
             self.root_state.clone(),
             reach_prob=(
-                {player: 1.0 for player in [-1] + self.players}
+                {player: 1.0 for player in self.players}
                 if self.simultaneous
                 else None
             ),
@@ -62,7 +62,7 @@ class PureCFR(CFRBase):
         if self.simultaneous or curr_player == updating_player:
 
             if self.simultaneous:
-                # increment the average policy for the player
+                # update the average policy for the player
                 self._avg_policy_at(curr_player, infostate)[sampled_action] += 1
                 # TODO: Simultaneous updating PURE CFR only works if we actually multiply the counterfactual reach
                 #  probability to the regret increment. Therefore, I am mixing the regret update rule from
@@ -77,17 +77,21 @@ class PureCFR(CFRBase):
 
             action_values = dict()
             for action in actions:
-                child_reach_prob = deepcopy(reach_prob)
                 if self.simultaneous:
-                    child_reach_prob[action] *= player_policy[action]
+                    child_reach_prob = copy(reach_prob)
+                    child_reach_prob[curr_player] *= player_policy[action]
+                else:
+                    child_reach_prob = reach_prob
 
                 action_values[action] = self._traverse(
                     state.child(action),
                     child_reach_prob,
                     updating_player,
                 )
+
             state_value = action_values[sampled_action]
             player_state_value = state_value[curr_player]
+
             regret_minimizer.observe(
                 self.iteration,
                 lambda a: prob_weight
@@ -102,13 +106,12 @@ class PureCFR(CFRBase):
         return state_value
 
     def _traverse_chance_node(self, state, reach_prob, updating_player):
-        outcomes_probs = state.chance_outcomes()
         outcome, _, _ = sample_on_policy(
-            values=[outcome[0] for outcome in outcomes_probs],
-            policy=[outcome[1] for outcome in outcomes_probs],
+            *zip(*state.chance_outcomes()),
             rng=self.rng,
         )
-        return self._traverse(state.child(int(outcome)), reach_prob, updating_player)
+        state.apply_action(int(outcome))
+        return self._traverse(state, reach_prob, updating_player)
 
     def _avg_policy_at(self, current_player, infostate):
         if infostate not in (player_policy := self._avg_policy[current_player]):
@@ -118,7 +121,11 @@ class PureCFR(CFRBase):
         return player_policy[infostate]
 
     def _sample_action(
-        self, infostate: Infostate, player_policy: Mapping[Action, Probability], *args, **kwargs
+        self,
+        infostate: Infostate,
+        player_policy: Mapping[Action, Probability],
+        *args,
+        **kwargs,
     ):
         if infostate not in self.plan:
             actions = self.action_list(infostate)

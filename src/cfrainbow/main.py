@@ -1,4 +1,6 @@
 import inspect
+import operator
+from functools import reduce
 from typing import Optional
 
 import pyspiel
@@ -27,6 +29,7 @@ def main(
     tqdm_print: bool = False,
     only_final_expl_print: bool = False,
     expl_threshold: Optional[float] = None,
+    expl_check_freq: int = 1,
     **kwargs,
 ):
     # get all kwargs that can be found in the parent classes' and the given class's __init__ func
@@ -44,10 +47,16 @@ def main(
     expl_values = []
     game = pyspiel.load_game(game_name)
     root_state = game.new_initial_state()
-    all_infostates = {
-        state.information_state_string(state.current_player())
-        for state, _ in all_states_gen(root=root_state.clone())
-    }
+    all_infostates = set()
+    uniform_joint_policy = dict()
+    for state, _ in all_states_gen(root=root_state.clone()):
+        infostate = state.information_state_string(state.current_player())
+        actions = state.legal_actions()
+        all_infostates.add(infostate)
+        uniform_joint_policy[infostate] = [
+            (action, 1.0 / len(actions)) for action in actions
+        ]
+
     n_infostates = len(all_infostates)
 
     solver = cfr_class(
@@ -58,7 +67,7 @@ def main(
     )
 
     gen = range(n_iter)
-    for i in gen if not tqdm_print else (pbar := tqdm(gen)):
+    for iteration in gen if not tqdm_print else (pbar := tqdm(gen)):
         if tqdm_print:
             pbar.set_description(
                 f"Method:{cfr_class.__name__} | "
@@ -70,16 +79,16 @@ def main(
         solver.iterate()
 
         avg_policy = solver.average_policy()
-        if sum(map(lambda p: len(p), avg_policy)) == n_infostates:
+        if iteration % expl_check_freq == 0:
             expl_values.append(
                 exploitability.exploitability(
                     game,
-                    to_pyspiel_tab_policy(avg_policy),
+                    to_pyspiel_tab_policy(avg_policy, uniform_joint_policy),
                 )
             )
 
             if (do_print and not only_final_expl_print) or (
-                i == n_iter - 1 and only_final_expl_print
+                iteration == n_iter - 1 and only_final_expl_print
             ):
                 print(
                     f"-------------------------------------------------------------"
@@ -113,17 +122,21 @@ def main(
 
 
 if __name__ == "__main__":
-    n_iters = 10000
-    # n_iters = int(1e10)
-    for minimizer in (rm.RegretMatcherPredictivePlus,):
+    # n_iters = 10000
+    n_iters = int(1e10)
+    for minimizer in (rm.RegretMatcher,):
         main(
-            cfr.PredictiveCFRPlus,
+            cfr.OutcomeSamplingMCCFR,
             n_iters,
             regret_minimizer=minimizer,
-            alternating=True,
+            alternating=False,
             do_print=False,
-            tqdm_print=False,
+            tqdm_print=True,
             only_final_expl_print=False,
-            expl_threshold=1e-7,
+            weighting_mode=cfr.OutcomeSamplingWeightingMode.lazy,
+            expl_threshold=1e-3,
             seed=0,
+            # game_name="python_efce_example_efg",
+            game_name="kuhn_poker",
+            expl_check_freq=500,
         )

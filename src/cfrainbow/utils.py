@@ -4,11 +4,13 @@ import itertools
 import warnings
 from enum import Enum
 from functools import reduce, singledispatchmethod
-from typing import Dict, List, Union, Any, Sequence, Mapping, Optional
+from typing import Dict, List, Union, Any, Sequence, Mapping, Optional, Tuple
 
 import numpy as np
 import pyspiel
 import numba
+
+from cfrainbow.spiel_types import Infostate, Action, Probability
 
 
 class KuhnAction(Enum):
@@ -108,9 +110,7 @@ def infostates_gen(
 ):
     for state, d in all_states_gen(root, False, False):
         curr_player = state.current_player()
-        yield state.information_state_string(
-            curr_player
-        ), curr_player, state, d
+        yield state.information_state_string(curr_player), curr_player, state, d
 
 
 class KuhnTensorToStr:
@@ -206,18 +206,29 @@ kuhn_poker_infostate_translation = {
 }
 
 
-def to_pyspiel_tab_policy(policy_list):
-    return pyspiel.TabularPolicy(
-        {
-            istate: [
-                (action, prob / max(1e-8, sum(as_and_ps.values())))
-                for action, prob in as_and_ps.items()
-            ]
-            for istate, as_and_ps in itertools.chain(
-                policy_list[0].items(), policy_list[1].items()
-            )
-        }
-    )
+def to_pyspiel_tab_policy(
+    policy_list,
+    default_policy: Optional[
+        Dict[
+            Infostate,
+            List[Tuple[Action, Probability]],
+        ]
+    ] = None,
+):
+    joint_policy = {
+        istate: [
+            (action, prob / max(1e-8, sum(as_and_ps.values())))
+            for action, prob in as_and_ps.items()
+        ]
+        for istate, as_and_ps in itertools.chain(
+            policy_list[0].items(), policy_list[1].items()
+        )
+    }
+    if default_policy is not None:
+        default_policy.update(joint_policy)
+    else:
+        default_policy = joint_policy
+    return pyspiel.TabularPolicy(default_policy)
 
 
 def sample_on_policy(
@@ -244,7 +255,7 @@ def print_kuhn_poker_policy_profile(policy_profile: List[Dict[str, Dict[int, flo
                 kuhn_poker_infostate_translation[(infostate, player)],
                 "-->",
                 list(
-                    f"{KuhnAction(action).name}: {round(prob, 2): .2f}"
+                    f"{KuhnAction(action).name}: {prob: .3f}"
                     for action, prob in action_policy.items()
                 ),
             )
@@ -295,7 +306,7 @@ def print_final_policy_profile(policy_profile):
                 kuhn_poker_infostate_translation[(infostate, i)],
                 "-->",
                 list(
-                    f"{KuhnAction(action).name}: {round(prob - optimal_for_alpha[i][infostate][action], 2): .2f}"
+                    f"{KuhnAction(action).name}: {prob - optimal_for_alpha[i][infostate][action]: .2f}"
                     for action, prob in dist.items()
                 ),
             )

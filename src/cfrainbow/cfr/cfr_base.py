@@ -1,6 +1,7 @@
 import functools
 import inspect
 from collections import deque
+from copy import copy
 from typing import Dict, Optional, Type, Sequence, MutableMapping, Union
 
 import numpy as np
@@ -8,6 +9,7 @@ import pyspiel
 
 from cfrainbow.rm import ExternalRegretMinimizer
 from cfrainbow.spiel_types import Action, Infostate, Probability, Player
+from cfrainbow.utils import slice_kwargs
 
 
 def iterate_logging(f):
@@ -44,26 +46,32 @@ class CFRBase:
         self.regret_minimizer_type: Type[
             ExternalRegretMinimizer
         ] = regret_minimizer_type
-        self.seed = seed
         self.verbose = verbose
-
+        self.seed = seed
         self.rng = np.random.default_rng(seed)
+        # the association of infostates to their local external regret minimizers.
+        # This dict will be filled on demand once the infostates have been encountered.
         self._regret_minimizer_dict: Dict[Infostate, ExternalRegretMinimizer] = {}
+        # these kwargs are going to be the keyword arguments with which every new regret minimizer
+        # is going to be instantiated.
         self._regret_minimizer_kwargs = {
             k: v
-            for k, v in regret_minimizer_kwargs.items()
-            if k in inspect.signature(regret_minimizer_type.__init__).parameters
+            for k, v in slice_kwargs(
+                regret_minimizer_kwargs, regret_minimizer_type.__init__
+            ).items()
         }
+        # the list of average policies per player
         self._avg_policy = (
             average_policy_list
             if average_policy_list is not None
             else [{} for _ in self.players]
         )
-        self._action_set: Dict[Infostate, Sequence[Action]] = {}
+        self._action_set: Dict[Infostate, list[Action]] = {}
+        # the update cycle for alternating update schemes. The default is 0 --> 1 --> 2 ...--> N --> 0 -->...
         self._player_update_cycle = deque(reversed(self.players))
+        self._alternating = alternating
         self._iteration = 0
         self._nodes_touched = 0
-        self._alternating = alternating
 
     @property
     def iteration(self):
@@ -81,13 +89,61 @@ class CFRBase:
     def nodes_touched(self):
         return self._nodes_touched
 
+    def iterate_for(self, n: int):
+        """
+        Convenience wrapper to run n iterations of the algorithm.
+        """
+        for _ in range(n):
+            self.iterate()
+
+    def iterate(self, updating_player: Optional[int] = None):
+        """
+        The actual CFR algorithm implementation.
+
+        Parameters
+        ----------
+        updating_player: Optional[int]
+            an external force to update this specific player next. Default is None, which allows the normal update
+            cycle to run. Note that if one passes a player in then the update cycle is permanently modified.
+
+        Returns
+        -------
+        None
+        """
+        raise NotImplementedError(f"method {self.iterate.__name__} is not implemented.")
+
     def average_policy(self, player: Optional[Player] = None):
+        """
+        Fetch the average policies of the given player or all at once.
+
+        Parameters
+        ----------
+        player: int
+            the optional player whose average policy to fetch. If none, all player policies are returned.
+
+        Returns
+        -------
+        List[Dict[str, Dict[int, float]
+            a list of state policies (i.e. maps of infostates to action policies).
+        """
         if player is None:
             return self._avg_policy
         else:
             return [self._avg_policy[player]]
 
     def regret_minimizer(self, infostate: Infostate):
+        """
+        Fetch the local regret minimizer in use at the given infostate.
+
+        Parameters
+        ----------
+        infostate: str
+
+        Returns
+        -------
+        ExternalRegretMinimizer
+            the external regret minimizer minimizing the local regret at the infostate.
+        """
         if infostate not in self._regret_minimizer_dict:
             self._regret_minimizer_dict[infostate] = self.regret_minimizer_type(
                 self.action_list(infostate), **self._regret_minimizer_kwargs
@@ -95,6 +151,17 @@ class CFRBase:
         return self._regret_minimizer_dict[infostate]
 
     def action_list(self, infostate: Infostate):
+        """
+        Fetch the list of legal actions at the infostate
+        Parameters
+        ----------
+        infostate: str
+
+        Returns
+        -------
+        List[int]
+            legal actions available to the active player at the infostate.
+        """
         if infostate not in self._action_set:
             raise KeyError(f"Infostate {infostate} not in action list lookup.")
         return self._action_set[infostate]
@@ -142,3 +209,12 @@ class CFRBase:
     def _action_value_map(self, infostate: Optional[Infostate] = None):
         return dict()
 
+    @staticmethod
+    def child_reach_prob_map(
+        reach_probability_map: MutableMapping[Player, Probability],
+        player: Player,
+        probability: Probability,
+    ):
+        child_reach_prob = copy(reach_probability_map)
+        child_reach_prob[player] *= probability
+        return child_reach_prob
