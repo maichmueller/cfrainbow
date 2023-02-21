@@ -6,7 +6,10 @@ __pycache__/
 wandb/
 
 *.pdf
+
 *.png
+!docs/cfrainbow_readme_banner_dark.png
+!docs/cfrainbow_readme_banner_light.png
 
 *.pkl
 
