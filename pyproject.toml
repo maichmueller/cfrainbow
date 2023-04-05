@@ -10,8 +10,10 @@ authors = [
 ]
 license = 'MIT license'
 description = 'Counterfactual Regret Minimization Open-Source Implementations'
-keywords = ['counterfactual regret minimization',
+keywords = [
+    'counterfactual regret minimization',
     'regret minimization',
+    'extensive form games',
     'cfr',
     'cfr+',
     'discounted cfr',
