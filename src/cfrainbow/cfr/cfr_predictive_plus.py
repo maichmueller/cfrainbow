@@ -6,7 +6,7 @@ from typing import Dict, Sequence, Optional, Type, List, Set
 
 import pyspiel
 
-from cfrainbow.rm import ExternalRegretMinimizer, RegretMatcherPredictivePlus
+from cfrainbow.rm import ExternalRegretMinimizer
 from cfrainbow.spiel_types import Infostate, Value, Action, Probability, Regret, Player
 from cfrainbow.utils import counterfactual_reach_prob, infostates_gen
 from .cfr_base import iterate_logging
@@ -29,10 +29,6 @@ class GetitemZero:
 class PredictiveCFRPlus(DiscountedCFR):
     def __init__(
         self,
-        root_state: pyspiel.State,
-        regret_minimizer_type: Type[
-            ExternalRegretMinimizer
-        ] = RegretMatcherPredictivePlus,
         *args,
         alpha=float("inf"),
         beta=-float("inf"),
@@ -46,8 +42,6 @@ class PredictiveCFRPlus(DiscountedCFR):
             )
         )
         super().__init__(
-            root_state,
-            regret_minimizer_type,
             *args,
             alpha=alpha,  # depending on regret minimizer may be ignored
             beta=beta,  # depending on regret minimizer may be ignored
@@ -58,7 +52,9 @@ class PredictiveCFRPlus(DiscountedCFR):
             lambda: ActionValues(defaultdict(float), 0.0, -1)
         )
 
-        self._prev_action_values: Dict[Infostate, ActionValues] = copy(self._current_action_values)
+        self._prev_action_values: Dict[Infostate, ActionValues] = copy(
+            self._current_action_values
+        )
 
         self.infostates = {player: set() for player in self.players}
         for infostate, player, state, _ in infostates_gen(root=self.root_state.clone()):
@@ -101,10 +97,9 @@ class PredictiveCFRPlus(DiscountedCFR):
         #     "fetches prediction from iteration",
         #     av.iteration,
         # )
-        # return av.mapping
         # return {
-        #     action: value / (av.cf_reach_probability + 1e-32)
-        #     # action: value
+        #     # action: value / (av.cf_reach_probability + 1e-32)
+        #     action: value
         #     for action, value in av.mapping.items()
         # }
 
@@ -114,12 +109,17 @@ class PredictiveCFRPlus(DiscountedCFR):
         current_player = state.current_player()
         state_value = [0.0] * self.nr_players
         av = self._current_action_values[infostate]
-        cf_rp = counterfactual_reach_prob(reach_prob, updating_player)
+        cf_rp = counterfactual_reach_prob(reach_prob, current_player)
         av.cf_reach_probability += cf_rp
+        # for action, action_prob in (
+        #     self.regret_minimizer(infostate)
+        #     .recommend(self.iteration, prediction=self.utility_prediction(infostate))
+        #     .items()
+        # ):
         for action, action_prob in (
-            self.regret_minimizer(infostate)
-            .recommend(self.iteration, prediction=self.utility_prediction(infostate))
-            .items()
+                self.regret_minimizer(infostate)
+                        .recommend(self.iteration)
+                        .items()
         ):
             child_value = self._traverse(
                 state.child(action),
@@ -139,7 +139,7 @@ class PredictiveCFRPlus(DiscountedCFR):
             # if self.verbose:
             #     print("Forcing the update on infostate", infostate)
             # self.regret_minimizer(infostate).recommend(
-            #     self.iteration, prediction=self.utility_prediction(infostate), force=True
+            #     self.iteration + 1, prediction=self.utility_prediction(infostate), force=True
             # )
             curr_av = self._current_action_values[infostate]
             curr_av.iteration = self.iteration

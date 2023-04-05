@@ -20,7 +20,7 @@ from cfrainbow.utils import (
 )
 
 
-def main(
+def run(
     cfr_class,
     n_iter,
     regret_minimizer: type[rm.ExternalRegretMinimizer] = rm.RegretMatcher,
@@ -69,11 +69,15 @@ def main(
     gen = range(n_iter)
     for iteration in gen if not tqdm_print else (pbar := tqdm(gen)):
         if tqdm_print:
+            if expl_values:
+                expl_print = f"{f'{expl_values[-1]: .5f}' if expl_values and expl_values[-1] > 1e-5 else f'{expl_values[-1]: .3E}'}"
+            else:
+                expl_print = " - "
             pbar.set_description(
                 f"Method:{cfr_class.__name__} | "
                 f"RM:{regret_minimizer.__name__} | "
                 f"kwargs:{solver_kwargs} | "
-                f"EXPL:{expl_values[-1] if expl_values else float('inf'):.6f}"
+                f"{expl_print}"
             )
 
         solver.iterate()
@@ -106,10 +110,11 @@ def main(
             if expl_threshold is not None and expl_values[-1] < expl_threshold:
                 print(f"Exploitability threshold of {expl_threshold} reached.")
                 break
-    print(
-        "\n---------------------------------------------------------------> Final Exploitability:",
-        expl_values[-1],
-    )
+    if do_print:
+        print(
+            "\n---------------------------------------------------------------> Final Exploitability:",
+            expl_values[-1],
+        )
     avg_policy = solver.average_policy()
     if (
         (do_print or only_final_expl_print)
@@ -124,9 +129,9 @@ def main(
 if __name__ == "__main__":
     # n_iters = 10000
     n_iters = int(1e10)
-    for minimizer in (rm.RegretMatcher,):
-        main(
-            cfr.OutcomeSamplingMCCFR,
+    for minimizer in (rm.AutoPredictiveRegretMatcher,):
+        run(
+            cfr.CFRPlus,
             n_iters,
             regret_minimizer=minimizer,
             alternating=False,
@@ -134,9 +139,9 @@ if __name__ == "__main__":
             tqdm_print=True,
             only_final_expl_print=False,
             weighting_mode=cfr.OutcomeSamplingWeightingMode.lazy,
-            expl_threshold=1e-3,
+            expl_threshold=1e-8,
             seed=0,
             # game_name="python_efce_example_efg",
             game_name="kuhn_poker",
-            expl_check_freq=500,
+            expl_check_freq=1,
         )

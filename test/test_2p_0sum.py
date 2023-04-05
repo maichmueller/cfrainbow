@@ -64,7 +64,7 @@ def case_name(val):
         (ExponentialCFR, (rm.RegretMatcher,), dict(alternating=False)),
         (ExponentialCFR, (rm.RegretMatcherPlus,), dict(alternating=True)),
         (ExponentialCFR, (rm.RegretMatcherPlus,), dict(alternating=False)),
-        (PredictiveCFRPlus, (rm.RegretMatcherPredictivePlus,), dict()),
+        (PredictiveCFRPlus, (rm.AutoPredictiveRegretMatcherPlus,), dict()),
     ]
     + [
         (
@@ -115,7 +115,6 @@ def test_efg(
     cfr_class_kwargs,
 ):
     game, root_state, all_infostates, avg_policy_list, uniform_joint = setup_game
-    n_infostates = len(all_infostates)
     solver = cfr_class(
         root_state,
         *cfr_class_args,
@@ -124,7 +123,6 @@ def test_efg(
         **cfr_class_kwargs,
     )
 
-    expl_value = float("inf")
     for i in tqdm(range(MAX_ITER)):
         solver.iterate()
 

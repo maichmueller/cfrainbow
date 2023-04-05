@@ -1,20 +1,17 @@
-from copy import deepcopy
-from typing import Dict, Mapping, Optional, Sequence
+from typing import Optional
 
-from .cfr_base import CFRBase, iterate_logging
-from cfrainbow.spiel_types import Action, Infostate, Probability, Value
-
-from cfrainbow.rm import ExternalRegretMinimizer
 import pyspiel
 
+from cfrainbow.spiel_types import Action, Probability, Player
 from cfrainbow.utils import counterfactual_reach_prob
+from .cfr_base import CFRBase, iterate_logging
 
 
 class CFRVanilla(CFRBase):
     @iterate_logging
     def iterate(
         self,
-        updating_player: Optional[int] = None,
+        updating_player: Optional[Player] = None,
     ):
         self._traverse(
             self.root_state.clone(),
@@ -27,7 +24,7 @@ class CFRVanilla(CFRBase):
         self,
         state: pyspiel.State,
         reach_prob_map: dict[Action, Probability],
-        updating_player: Optional[int] = None,
+        updating_player: Optional[Player] = None,
     ):
         self._nodes_touched += 1
 
@@ -50,7 +47,7 @@ class CFRVanilla(CFRBase):
                 # update the cumulative regret
 
                 player_state_value = (
-                    state_value[curr_player] if regret_minimizer.regret_mode else 0.0
+                    state_value[curr_player] if regret_minimizer.observes_regret else 0.0
                 )
                 cf_reach_p = counterfactual_reach_prob(reach_prob_map, curr_player)
                 regret_minimizer.observe(

@@ -127,7 +127,9 @@ def plot_rainbow(
 
                 title_x_start = 0.655
                 title_y_start = 0.865
-                letter_x_offset = 0.016
+                letter_x_offset = [0.015] * len("ainbow")
+                letter_x_offset[2] = 0.0121
+                letter_x_offset[3] = 0.0147
                 letter_y_offset = 0.0011
                 rotation = -3
                 ax.text(
@@ -143,7 +145,7 @@ def plot_rainbow(
                 )
                 for i, letter in enumerate("ainbow"):
                     ax.text(
-                        title_x_start + 0.195 + i * letter_x_offset,
+                        title_x_start + 0.195 + i * letter_x_offset[i],
                         title_y_start - 0.064 - i * letter_y_offset,
                         letter,
                         fontfamily=font,
@@ -245,7 +247,6 @@ def plot_rainbow(
 
 
 def running_mean(values, window_size: int = 10):
-    # return np.convolve(values, np.ones(window_size) / window_size, mode="valid")
     return [
         np.mean(values[max(0, -window_size + i) : i + 1]) for i in range(len(values))
     ]
@@ -420,7 +421,6 @@ if __name__ == "__main__":
             plot_rainbow(
                 n_iters,
                 averaged_values,
-                game_name=" ".join([s.capitalize() for s in game.split("_")]),
                 save=True,
                 save_name=f"{seed}",
                 light=light

@@ -10,7 +10,7 @@ from typing import (
 
 from numba import njit
 
-from .standalone import (
+from .unbound import (
     hedge,
     regret_matching,
     regret_matching_plus,
@@ -152,7 +152,46 @@ class UtilityToRegretMixin:
         self._super__recommend[UtilityToRegretMixin](*args, **kwargs)
 
 
+class RegretMatchingMixin:
+    cumulative_quantity: Dict[Action, float]
+    recommendation: Dict[Action, float]
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._super__recommend = getattr(self, "_super__recommend", dict())
+        self._super__recommend[RegretMatchingMixin] = _parent_func(
+            RegretMatchingMixin, self, "_recommend"
+        )
+
+    def _regret_minimizer_impl(self, *args, **kwargs):
+        return regret_matching(*args, **kwargs)
+
+    def _predictive_regret_minimizer_impl(self, *args, **kwargs):
+        return predictive_regret_matching(*args, **kwargs)
+
+    def _recommend(
+        self,
+        *args,
+        prediction: Optional[Mapping[Action, Value]] = None,
+        **kwargs,
+    ):
+        if prediction is None:
+            self._regret_minimizer_impl(self.recommendation, self.cumulative_quantity)
+        else:
+            self._predictive_regret_minimizer_impl(
+                prediction, self.recommendation, self.cumulative_quantity
+            )
+        self._super__recommend[RegretMatchingMixin](
+            *args, prediction=prediction, **kwargs
+        )
+
+
+class RegretMatchingPlusMixin(RegretMatchingMixin):
+    def _regret_minimizer_impl(self, *args, **kwargs):
+        return regret_matching_plus(*args, **kwargs)
+
+    def _predictive_regret_minimizer_impl(self, *args, **kwargs):
+        return predictive_regret_matching_plus(*args, **kwargs)
 
 
 @njit
@@ -192,77 +231,74 @@ class RegretDiscounterMixin:
 
     def _recommend(
         self,
-        iteration: Optional[int] = None,
         *args,
-        prediction: Optional[Mapping[Action, Value]] = None,
         **kwargs,
     ):
         self._apply_weights()
         self._super__recommend[RegretDiscounterMixin](*args, **kwargs)
 
 
-class RegretMatchingMixin:
+class AutoPredictiveMixin:
+    """ """
+
     cumulative_quantity: Dict[Action, float]
     recommendation: Dict[Action, float]
+    actions: list[Action]
+    _last_update_time: int
+    observes_regret: property
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self._last_seen_quantity = {a: 0.0 for a in self.actions}
+
         self._super__recommend = getattr(self, "_super__recommend", dict())
-        self._super__recommend[RegretMatchingMixin] = _parent_func(
-            RegretMatchingMixin, self, "_recommend"
+        self._super__recommend[AutoPredictiveMixin] = _parent_func(
+            AutoPredictiveMixin, self, "_recommend"
         )
-
-    @classmethod
-    def _regret_minimizer_impl(cls, *args, **kwargs):
-        return regret_matching(*args, **kwargs)
-
-    @classmethod
-    def _predictive_regret_minimizer_impl(cls, *args, **kwargs):
-        return predictive_regret_matching(*args, **kwargs)
+        self._super__observe = getattr(self, "_super__observe", dict())
+        self._super__observe[AutoPredictiveMixin] = _parent_func(
+            AutoPredictiveMixin, self, "_observe"
+        )
 
     def _recommend(
         self,
-        iteration: Optional[int] = None,
         *args,
-        prediction: Optional[Mapping[Action, Value]] = None,
         **kwargs,
     ):
-        if prediction is None:
-            self._regret_minimizer_impl(self.recommendation, self.cumulative_quantity)
-        else:
-            self._predictive_regret_minimizer_impl(
-                prediction, self.recommendation, self.cumulative_quantity
+        if not self.observes_regret:
+            prediction_expectation = sum(
+                self.recommendation[a] * last_action_quantity
+                for a, last_action_quantity in self._last_seen_quantity.items()
             )
-        self._super__recommend[RegretMatchingMixin](*args, **kwargs)
+            prediction = {
+                a: v / prediction_expectation
+                for a, v in self._last_seen_quantity.items()
+            }
+        else:
+            prediction = self._last_seen_quantity
+        self._super__recommend[AutoPredictiveMixin](
+            *args, prediction=prediction, **kwargs
+        )
+        # delete the current storage after the entire recommendation update ran
+        self._last_seen_quantity = {a: 0.0 for a in self.actions}
 
-
-class RegretMatchingPlusMixin(RegretMatchingMixin):
-    @classmethod
-    def _regret_minimizer_impl(cls, *args, **kwargs):
-        return regret_matching_plus(*args, **kwargs)
-
-    @classmethod
-    def _predictive_regret_minimizer_impl(cls, *args, **kwargs):
-        return predictive_regret_matching_plus(*args, **kwargs)
-
-
-# class RegretMatcher(ExternalRegretMinimizer):
-#     _regret_minimizer_impl = regret_matching
-#     _predictive_regret_minimizer_impl = predictive_regret_matching
-#
-#     def _recommend(
-#         self,
-#         iteration: Optional[int] = None,
-#         *args,
-#         prediction: Optional[Mapping[Action, Value]] = None,
-#         **kwargs,
-#     ):
-#         if prediction is None:
-#             self._regret_minimizer_impl(self.recommendation, self.cumulative_quantity)
-#         else:
-#             self._predictive_regret_minimizer_impl(
-#                 prediction, self.recommendation, self.cumulative_quantity
-#             )
+    def _observe(
+        self,
+        iteration: int,
+        regret_or_utility: Callable[[Action], float],
+        *args,
+        **kwargs,
+    ):
+        # first call the parent's _observe method
+        self._super__observe[AutoPredictiveMixin](
+            iteration,
+            regret_or_utility,
+            *args,
+            **kwargs,
+        )
+        # then add the input to the last seen quantity storage
+        for action in self.actions:
+            self._last_seen_quantity[action] += regret_or_utility(action)
 
 
 class RegretMatcher(RegretMatchingMixin, ExternalRegretMinimizer):
@@ -280,186 +316,25 @@ class RegretMatcherDiscounted(
 
 
 class RegretMatcherDiscountedPlus(
-    RegretDiscounterMixin, RegretMatcherPlus, ExternalRegretMinimizer
+    RegretDiscounterMixin, RegretMatchingPlusMixin, ExternalRegretMinimizer
 ):
     pass
 
 
-# class RegretMatcherDiscounted(RegretMatcher):
-#     def __init__(self, actions: Iterable[Action], alpha: float, beta: float):
-#         super().__init__(actions)
-#         self.alpha = alpha
-#         self.beta = beta
-#
-#     def _apply_weights(self):
-#         alpha, beta = weights(self._last_update_time + 1, self.alpha, self.beta)
-#         for action, regret in self.cumulative_quantity.items():
-#             self.cumulative_quantity[action] = regret * (alpha if regret > 0 else beta)
-#
-#     def _recommend(
-#         self,
-#         iteration: Optional[int] = None,
-#         *args,
-#         prediction: Optional[Mapping[Action, Value]] = None,
-#         **kwargs,
-#     ):
-#         self._apply_weights()
-#         if prediction is None:
-#             self._regret_minimizer_impl(self.recommendation, self.cumulative_quantity)
-#         else:
-#             self._predictive_regret_minimizer_impl(
-#                 prediction, self.recommendation, self.cumulative_quantity
-#             )
-#
+class AutoPredictiveRegretMatcher(
+    AutoPredictiveMixin, RegretMatchingMixin, ExternalRegretMinimizer
+):
+    pass
 
 
-# class RegretMatcherDiscounted(RegretMatcher):
-#     def __init__(self, actions: Iterable[Action], alpha: float, beta: float):
-#         super().__init__(actions)
-#         self.alpha = alpha
-#         self.beta = beta
-#
-#     def _apply_weights(self):
-#         alpha, beta = weights(self._last_update_time + 1, self.alpha, self.beta)
-#         for action, regret in self.cumulative_quantity.items():
-#             self.cumulative_quantity[action] = regret * (alpha if regret > 0 else beta)
-#
-#     def _recommend(
-#         self,
-#         iteration: Optional[int] = None,
-#         *args,
-#         prediction: Optional[Mapping[Action, Value]] = None,
-#         **kwargs,
-#     ):
-#         self._apply_weights()
-#         if prediction is None:
-#             regret_matching(self.recommendation, self.cumulative_quantity)
-#         else:
-#             predictive_regret_matching(
-#                 prediction, self.recommendation, self.cumulative_quantity
-#             )
-
-
-class RegretMatcherDiscountedPlus(RegretMatcherDiscounted):
-    def _recommend(self, *args, **kwargs):
-        self._apply_weights()
-        regret_matching_plus(self.recommendation, self.cumulative_quantity)
-
-
-class AutoPredictiveRegretMatcher(RegretMatcher):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._last_utilities = {a: 0.0 for a in self.actions}
-
-    def _recommend(
-        self,
-        iteration: Optional[int] = None,
-        *args,
-        prediction: Optional[Mapping[Action, Value]] = None,
-        **kwargs,
-    ):
-        if prediction is None:
-            prediction = self._last_utilities
-        predictive_regret_matching(
-            prediction, self.recommendation, self.cumulative_quantity
-        )
-        self._last_utilities = {a: 0.0 for a in self.actions}
-
-    def _observe(
-        self,
-        iteration: int,
-        regret_or_utility: Callable[[Action], float],
-        *args,
-        **kwargs,
-    ):
-        for action in self.cumulative_quantity.keys():
-            value = regret_or_utility(action)
-            self.cumulative_quantity[action] += value
-            self._last_utilities[action] += value
-
-
-class AutoPredictiveRegretMatcherPlus(AutoPredictiveRegretMatcher):
-    def _recommend(
-        self,
-        iteration: Optional[int] = None,
-        *args,
-        prediction: Optional[Mapping[Action, Value]] = None,
-        **kwargs,
-    ):
-        if prediction is None:
-            prediction = self._last_utilities
-        predictive_regret_matching_plus(
-            prediction, self.recommendation, self.cumulative_quantity
-        )
-        self._last_utilities = {a: 0.0 for a in self.actions}
-
-
-# class AutoPredictiveRegretMatcherPlus(AutoPredictiveRegretMatcher):
-#     def _recommend(
-#         self,
-#         iteration: Optional[int] = None,
-#         *args,
-#         prediction: Optional[Mapping[Action, Value]] = None,
-#         **kwargs,
-#     ):
-#         if prediction is None:
-#             prediction = self._last_utilities
-#         predictive_regret_matching_plus(
-#             prediction, self.recommendation, self.cumulative_quantity
-#         )
-#         self._last_utilities = {a: 0.0 for a in self.actions}
-#
-#
-# class AutoPredictiveRegretMatcher(RegretMatcher):
-#     def __init__(self, *args, **kwargs):
-#         super().__init__(*args, **kwargs)
-#         self._last_utilities = {a: 0.0 for a in self.actions}
-#
-#     def _recommend(
-#         self,
-#         iteration: Optional[int] = None,
-#         *args,
-#         prediction: Optional[Mapping[Action, Value]] = None,
-#         **kwargs,
-#     ):
-#         if prediction is None:
-#             prediction = self._last_utilities
-#         predictive_regret_matching(
-#             prediction, self.recommendation, self.cumulative_quantity
-#         )
-#         self._last_utilities = {a: 0.0 for a in self.actions}
-#
-#     def _observe(
-#         self,
-#         iteration: int,
-#         regret_or_utility: Callable[[Action], float],
-#         *args,
-#         **kwargs,
-#     ):
-#         for action in self.cumulative_quantity.keys():
-#             value = regret_or_utility(action)
-#             self.cumulative_quantity[action] += value
-#             self._last_utilities[action] += value
-
-
-class AutoPredictiveRegretMatcherPlus(AutoPredictiveRegretMatcher):
-    def _recommend(
-        self,
-        iteration: Optional[int] = None,
-        *args,
-        prediction: Optional[Mapping[Action, Value]] = None,
-        **kwargs,
-    ):
-        if prediction is None:
-            prediction = self._last_utilities
-        predictive_regret_matching_plus(
-            prediction, self.recommendation, self.cumulative_quantity
-        )
-        self._last_utilities = {a: 0.0 for a in self.actions}
+class AutoPredictiveRegretMatcherPlus(
+    AutoPredictiveMixin, RegretMatchingPlusMixin, ExternalRegretMinimizer
+):
+    pass
 
 
 @njit
-def anytime_hedge_rate(iteration: int, nr_actions: int) -> float:
+def anytime_hedge_rate(iteration: int, nr_actions: int, *args, **kwargs) -> float:
     """
     Learning rate of the hedge algorithm to achieve anytime O(sqrt(log(N) * T)) regret.
 
@@ -491,13 +366,18 @@ class Hedge(ExternalRegretMinimizer):
         self,
         actions: Iterable[Action],
         *args,
-        learning_rate: Callable[[int, int], float] = anytime_hedge_rate,
+        learning_rate: Callable[
+            [int, int, Sequence, Mapping], float
+        ] = anytime_hedge_rate,
         **kwargs,
     ):
         super().__init__(actions, *args, **kwargs)
         # function computing the learning rate for the given iteration and nr of actions to consider
-        self._learning_rate: Callable[[int, int], float] = learning_rate
+        self._learning_rate: Callable[
+            [int, int, Sequence, Mapping], float
+        ] = learning_rate
 
+    @property
     def observes_regret(self):
         return False
 
@@ -505,5 +385,5 @@ class Hedge(ExternalRegretMinimizer):
         hedge(
             self.recommendation,
             self.cumulative_quantity,
-            lr=self._learning_rate(iteration, len(self)),
+            lr=self._learning_rate(iteration, len(self), *args, **kwargs),
         )

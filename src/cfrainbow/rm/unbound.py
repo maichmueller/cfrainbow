@@ -7,8 +7,11 @@ from typing import (
 from ..spiel_types import *
 
 
+_POS_THRESH = 1e-8
+
+
 def normalize_or_uniformize_policy(policy, pos_regret_dict, pos_regret_sum):
-    if pos_regret_sum > 0.0:
+    if pos_regret_sum > _POS_THRESH:
         for action, pos_regret in pos_regret_dict.items():
             policy[action] = pos_regret / pos_regret_sum
     else:
@@ -46,12 +49,12 @@ def predictive_regret_matching(
     cumul_regret_map: Mapping[Action, float],
 ):
     pos_regret_sum = 0.0
-    avg_prediction: float = sum(
+    expected_prediction: float = sum(
         [prediction[action] * action_prob for action, action_prob in policy.items()]
     )
     positivized_regret_map = dict()
     for action, regret in cumul_regret_map.items():
-        pos_regret = max(0.0, regret + (prediction[action] - avg_prediction))
+        pos_regret = max(0.0, regret + (prediction[action] - expected_prediction))
         pos_regret_sum += pos_regret
         positivized_regret_map[action] = pos_regret
     normalize_or_uniformize_policy(policy, positivized_regret_map, pos_regret_sum)
