@@ -62,10 +62,10 @@ class OutcomeSamplingMCCFR(CFRBase):
     def _traverse(
         self,
         state: pyspiel.State,
-        reach_prob: dict[Player, float],
+        reach_prob: Dict[Player, float],
         updating_player: Optional[Player] = None,
         sample_probability=1.0,
-        weights: Optional[dict[Player, float]] = None,
+        weights: Optional[Dict[Player, float]] = None,
     ):
         self._nodes_touched += 1
 

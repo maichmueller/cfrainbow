@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Dict
 
 import pyspiel
 
@@ -23,7 +23,7 @@ class CFRVanilla(CFRBase):
     def _traverse(
         self,
         state: pyspiel.State,
-        reach_prob_map: dict[Action, Probability],
+        reach_prob_map: Dict[Action, Probability],
         updating_player: Optional[Player] = None,
     ):
         self._nodes_touched += 1

@@ -313,7 +313,7 @@ def print_final_policy_profile(policy_profile):
 
 
 def slice_kwargs(given_kwargs, *func):
-    possible_kwargs = {}
+    possible_kwargs = set()
     for f in func:
-        possible_kwargs |= inspect.signature(f).parameters
+        possible_kwargs = possible_kwargs.union(inspect.signature(f).parameters)
     return {k: v for k, v in given_kwargs.items() if k in possible_kwargs}

@@ -47,6 +47,7 @@ numpy = [
     { version = ">=1.19", python = "<=3.9" }
 ]
 open_spiel = { version = ">=1.0" }
+tqdm = "*"
 numba = { version = ">=0.5" }
 
 [tool.poetry.group.dev.dependencies]

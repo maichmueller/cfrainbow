@@ -243,7 +243,7 @@ def infostate_sequences(sequences: Dict[Tuple[Infostate, Action], SequenceAttr])
 
     Returns
     -------
-    dict[Infostate, List[DepthInformedSequence]]
+    Dict[Infostate, List[DepthInformedSequence]]
         the dictionary of root infostates to possible continuation sequences
     """
     # the action list are all of that player's actions leading up the infostate I and including the action to

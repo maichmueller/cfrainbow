@@ -5,7 +5,7 @@ from typing import (
     Dict,
     Callable,
     Optional,
-    Any,
+    Any, List,
 )
 
 from numba import njit
@@ -113,7 +113,7 @@ def _parent_func(cls: type, obj: Any, func_name: str):
 class UtilityToRegretMixin:
     cumulative_quantity: Dict[Action, float]
     recommendation: Dict[Action, float]
-    actions: list[Action]
+    actions: List[Action]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -212,7 +212,7 @@ def weights(t: int, alpha: float, beta: float):
 class RegretDiscounterMixin:
     cumulative_quantity: Dict[Action, float]
     recommendation: Dict[Action, float]
-    actions: list[Action]
+    actions: List[Action]
     _last_update_time: int
 
     def __init__(self, *args, alpha: float, beta: float, **kwargs):
@@ -243,7 +243,7 @@ class AutoPredictiveMixin:
 
     cumulative_quantity: Dict[Action, float]
     recommendation: Dict[Action, float]
-    actions: list[Action]
+    actions: List[Action]
     _last_update_time: int
     observes_regret: property
 

@@ -60,7 +60,7 @@ class ExponentialCFR(CFRBase):
     def _traverse(
         self,
         state: pyspiel.State,
-        reach_prob: dict[Action, Probability],
+        reach_prob: Dict[Action, Probability],
         updating_player: Optional[Player] = None,
     ):
         self._nodes_touched += 1

@@ -1,6 +1,6 @@
 from __future__ import annotations
 from copy import copy
-from typing import Sequence, Mapping, Tuple, Union
+from typing import Sequence, Mapping, Tuple, Union, Dict
 
 import pyspiel
 
@@ -8,7 +8,7 @@ from cfrainbow.spiel_types import Player, Action
 
 
 class Node:
-    def __init__(self, name: str, children: dict[str, str] = None, parent: str = None):
+    def __init__(self, name: str, children: Dict[str, str] = None, parent: str = None):
         self._name = name
         self._parent = parent
         self._children = dict(children)
