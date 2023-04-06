@@ -42,14 +42,14 @@ class SequenceAttr:
     succ_infostates: Set[Infostate]
 
 
-def depth_informed_seq_filter(x: DepthInformedSequence):
+def depth_informed_seq_order(x: DepthInformedSequence):
     # sort by depth first, then by the infostate str comparison
     # return x.depth, x.infostate
     # sort by length of infostate first, then by the alphabetical order of the infostate str
     return len(x.infostate), x.infostate
 
 
-def infostate_filter(istate: Infostate):
+def infostate_order(istate: Infostate):
     return len(istate), istate
 
 
@@ -91,12 +91,12 @@ def nf_strategy_space(
         strategy_spaces[player] = set(
             tuple(
                 (sorted_plan.infostate, sorted_plan.action)
-                for sorted_plan in sorted(plan, key=depth_informed_seq_filter)
+                for sorted_plan in sorted(plan, key=depth_informed_seq_order)
             )
             for plan in itertools.product(
                 *sorted(
                     action_space,
-                    key=depth_informed_seq_filter,
+                    key=depth_informed_seq_order,
                 )
             )
         )
@@ -209,7 +209,7 @@ def reduced_nf_space_gen(
             yield tuple(
                 (infostate, action)
                 for infostate, action, _ in sorted(
-                    itertools.chain(*seq_lists_combo), key=depth_informed_seq_filter
+                    itertools.chain(*seq_lists_combo), key=depth_informed_seq_order
                 )
             )
 
@@ -410,7 +410,7 @@ def reachable_terminal_states(
 def behaviour_to_nf_strategy(
     game: pyspiel.Game,
     players: Sequence[Player],
-    behavior_strategies: Mapping[
+    behaviour_strategies: Mapping[
         Player,
         Mapping[
             Infostate, Union[Mapping[Action, Probability], Tuple[Action, Probability]]
@@ -425,7 +425,7 @@ def behaviour_to_nf_strategy(
         plans = reduced_nf_space(game, *players)
 
     terminal_reach_prob = terminal_reach_probabilities(
-        game, players, behavior_strategies
+        game, players, behaviour_strategies
     )
 
     nf_strategies_out = dict()
@@ -457,7 +457,7 @@ def nf_to_behaviour_strategy(
     normal_form_strategies: Mapping[
         Player, Sequence[Tuple[NormalFormPlan, Probability]]
     ],
-) -> Dict[Infostate, Dict[Action, Probability]]:
+) -> Dict[Player, Dict[Infostate, Dict[Action, Probability]]]:
 
     behaviour_strategies_out = dict()
     for player in players:
@@ -476,7 +476,7 @@ def nf_to_behaviour_strategy(
 def terminal_reach_probabilities(
     game: pyspiel.Game,
     players: Sequence[Player],
-    behavior_strategies: Mapping[
+    behaviour_strategies: Mapping[
         Player, Mapping[Infostate, Mapping[Action, Probability]]
     ],
 ):
@@ -494,7 +494,7 @@ def terminal_reach_probabilities(
         else:
             if (curr_player := state.current_player()) in players:
                 infostate = state.information_state_string(curr_player)
-                policy = behavior_strategies[curr_player][infostate]
+                policy = behaviour_strategies[curr_player][infostate]
                 for action in state.legal_actions():
                     child_reach_prob = deepcopy(reach_prob)
                     child_reach_prob[curr_player] *= policy[action]

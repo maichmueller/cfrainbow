@@ -14,10 +14,13 @@ Infostate = str
 NormalFormPlan = Tuple[Tuple[Infostate, Action], ...]
 # a strategy is a distribution over plans
 NormalFormStrategy = Mapping[NormalFormPlan, float]
+# a normal-form strategy space is a set of strategies
 NormalFormStrategySpace = Set[NormalFormPlan]
 
 # a sequence-form deterministic strategy (plan) is equivalent to a reduced normal-form plan
 SequenceFormPlan = NormalFormPlan
+# a sequence-form strategy is a distribution over sequence-form plans
+SequenceFormStrategy = NormalFormStrategy
 
 
 class JointNormalFormPlan:
