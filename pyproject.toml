@@ -52,4 +52,5 @@ numba = { version = ">=0.5" }
 
 [tool.poetry.group.dev.dependencies]
 pytest = "*"
+pytest-xdist = "*"
 pytest-cov = "*"

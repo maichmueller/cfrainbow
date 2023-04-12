@@ -1,7 +1,4 @@
 import itertools
-import operator
-from functools import reduce
-
 import pyspiel
 import pytest
 from tqdm import tqdm
@@ -10,9 +7,13 @@ from cfrainbow import rm
 from cfrainbow.cfr import *
 from cfrainbow.cfr.cfr_base import CFRBase
 from cfrainbow.utils import all_states_gen, to_pyspiel_tab_policy
+from .utils import CircularList
+
 
 MAX_ITER = int(1e6)
-expl_threshold = 1e-2
+EXPL_THRESH = 1e-2
+EXPL_INTERVAL = 100
+WINDOW_SIZE = 10
 
 
 @pytest.fixture(params=["python_efce_example_efg", "kuhn_poker"])
@@ -34,7 +35,13 @@ def setup_game(request):
             (action, 1.0 / len(actions)) for action in actions
         ]
 
-    return game, root_state, all_infostates, list(avg_policy_list.values()), uniform_joint_policy
+    return (
+        game,
+        root_state,
+        all_infostates,
+        list(avg_policy_list.values()),
+        uniform_joint_policy,
+    )
 
 
 def case_name(val):
@@ -122,17 +129,18 @@ def test_efg(
         # average_policy_list=avg_policy_list,
         **cfr_class_kwargs,
     )
-
+    expls = CircularList(WINDOW_SIZE, 0.0)
     for i in tqdm(range(MAX_ITER)):
         solver.iterate()
 
         avg_policy = solver.average_policy()
 
-        if (i % 1000) == 0:
+        if ((i + 1) % EXPL_INTERVAL) == 0:
             expl_value = pyspiel.exploitability(
                 game,
                 to_pyspiel_tab_policy(avg_policy, uniform_joint),
             )
-            if expl_value < expl_threshold:
+            expls.push(expl_value)
+            if sum(expls) / WINDOW_SIZE < EXPL_THRESH:
                 return
     assert False
