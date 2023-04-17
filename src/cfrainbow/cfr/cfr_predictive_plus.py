@@ -43,8 +43,8 @@ class PredictiveCFRPlus(DiscountedCFR):
         )
         super().__init__(
             *args,
-            alpha=alpha,  # depending on regret minimizer may be ignored
-            beta=beta,  # depending on regret minimizer may be ignored
+            alpha=alpha,
+            beta=beta,
             gamma=gamma,
             **kwargs,
         )

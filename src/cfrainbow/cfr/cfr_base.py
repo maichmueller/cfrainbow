@@ -206,9 +206,6 @@ class CFRBase:
         # '[iteration] [player] / [nr_players]' to highlight which player of this update cycle is currently updated
         return f"{self.iteration} [{divisor} | {(remainder + 1)}/{self.nr_players}]"
 
-    def _action_value_map(self, infostate: Optional[Infostate] = None):
-        return dict()
-
     @staticmethod
     def child_reach_prob_map(
         reach_probability_map: MutableMapping[Player, Probability],

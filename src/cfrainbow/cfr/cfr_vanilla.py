@@ -37,31 +37,18 @@ class CFRVanilla(CFRBase):
             curr_player = state.current_player()
             infostate = state.information_state_string(curr_player)
             self._set_action_list(infostate, state)
-            action_values = self._action_value_map(infostate)
+            action_values = dict()
             state_value = self._traverse_player_node(
                 state, infostate, reach_prob_map, updating_player, action_values
             )
             if self.simultaneous or updating_player == curr_player:
-                regret_minimizer = self.regret_minimizer(infostate)
-
-                # update the cumulative regret
-
-                player_state_value = (
-                    state_value[curr_player] if regret_minimizer.observes_regret else 0.0
+                self._update_regret_and_policy(
+                    curr_player,
+                    infostate,
+                    action_values,
+                    state_value,
+                    reach_prob_map,
                 )
-                cf_reach_p = counterfactual_reach_prob(reach_prob_map, curr_player)
-                regret_minimizer.observe(
-                    self.iteration,
-                    lambda a: cf_reach_p * (action_values[a][curr_player] - player_state_value),
-                )
-
-                # update the average policy
-
-                player_reach_prob = reach_prob_map[curr_player]
-                avg_policy = self._avg_policy_at(curr_player, infostate)
-                for action, curr_policy_prob in regret_minimizer.recommend(self.iteration).items():
-                    avg_policy[action] += player_reach_prob * curr_policy_prob
-
             return state_value
 
     def _traverse_chance_node(self, state, reach_prob, updating_player):
@@ -97,3 +84,29 @@ class CFRVanilla(CFRBase):
                 state_value[p] += action_prob * child_value[p]
 
         return state_value
+
+    def _update_regret_and_policy(
+            self,
+            curr_player,
+            infostate,
+            action_values,
+            state_value,
+            reach_prob_map,
+    ):
+        regret_minimizer = self.regret_minimizer(infostate)
+        # update the cumulative regret
+        player_state_value = (
+            state_value[curr_player] if regret_minimizer.observes_regret else 0.0
+        )
+        cf_reach_p = counterfactual_reach_prob(reach_prob_map, curr_player)
+        regret_minimizer.observe(
+            self.iteration,
+            lambda a: cf_reach_p * (action_values[a][curr_player] - player_state_value),
+        )
+        # update the average policy
+        player_reach_prob = reach_prob_map[curr_player]
+        avg_policy = self._avg_policy_at(curr_player, infostate)
+        for action, curr_policy_prob in regret_minimizer.recommend(
+                self.iteration
+        ).items():
+            avg_policy[action] += player_reach_prob * curr_policy_prob

@@ -9,7 +9,6 @@ from cfrainbow.cfr.cfr_base import CFRBase
 from cfrainbow.utils import all_states_gen, to_pyspiel_tab_policy
 from .utils import CircularList
 
-
 MAX_ITER = int(1e6)
 EXPL_THRESH = 1e-2
 EXPL_INTERVAL = 100
