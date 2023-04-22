@@ -11,8 +11,8 @@
 
 CFRainbow provides implementations of the basic CFR algorithm and some of the improved variants of CFR
 for computing <b>Nash Equilibria</b> in the 2-player 0-sum case as well as <b>Correlated Equilibria</b> in the general-sum case. 
-The pacakge is loosely built for modularity and general applicability, 
-not performance, and integrates into the Openspiel framework by Deepmind.
+The pacakge is loosely built for modularity and general applicability by building on the Openspiel framework by Deepmind. CFRainbow is <b>not</b> built
+for performance and will not scale well to large game implementations. Most algorithms are implemented with basic python data structures.
 
 ## Available Algorithms
 
@@ -79,9 +79,7 @@ import cfrainbow
 from cfrainbow import cfr
 import pyspiel
 
-game = pyspiel.load_game("kuhn_poker")
-solver = cfr.VanillaCFR()
-solver.run(game)
+cfrainbow.run(cfr.VanillaCFR, n_iter=1000, game="kuhn_poker", regret_minimizer=cfr.rm.RegretMatcher)
 ```
 For more detailed examples, please refer to the examples directory.
 
