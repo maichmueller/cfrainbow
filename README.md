@@ -73,7 +73,7 @@ Usage
 To use CFRainbow, import the desired algorithm from the package and call its solve_game method with a game as input.
 For example, to use the Vanilla CFR algorithm:
 
-python
+```python
 
 import cfrainbow
 from cfrainbow import cfr
@@ -82,7 +82,7 @@ import pyspiel
 game = pyspiel.load_game("kuhn_poker")
 solver = cfr.VanillaCFR()
 solver.run(game)
-
+```
 For more detailed examples, please refer to the examples directory.
 
 
