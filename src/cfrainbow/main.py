@@ -1,7 +1,7 @@
 import inspect
 import operator
 from functools import reduce
-from typing import Optional
+from typing import Optional, Type, Union
 
 import pyspiel
 from open_spiel.python.algorithms import exploitability
@@ -9,22 +9,23 @@ from tqdm import tqdm
 
 import cfrainbow.cfr as cfr
 import cfrainbow.rm as rm
+from cfrainbow.cfr.cfr_base import CFRBase
 
 from cfrainbow.utils import (
     all_states_gen,
     print_final_policy_profile,
     print_kuhn_poker_policy_profile,
-    to_pyspiel_tab_policy,
+    to_pyspiel_policy,
     normalize_policy_profile,
     slice_kwargs,
 )
 
 
 def run(
-    cfr_class,
-    n_iter,
+    solver: Type[CFRBase],
+    n_iter: int,
     regret_minimizer: type[rm.ExternalRegretMinimizer] = rm.RegretMatcher,
-    game_name: str = "kuhn_poker",
+    game: Union[pyspiel.Game, str] = "kuhn_poker",
     do_print: bool = True,
     tqdm_print: bool = False,
     only_final_expl_print: bool = False,
@@ -34,18 +35,18 @@ def run(
 ):
     # get all kwargs that can be found in the parent classes' and the given class's __init__ func
     solver_kwargs = slice_kwargs(
-        kwargs, *[cls.__init__ for cls in inspect.getmro(cfr_class)]
+        kwargs, *[cls.__init__ for cls in inspect.getmro(solver)]
     )
     if do_print:
         print(
-            f"Running {cfr_class.__name__} "
+            f"Running {solver.__name__} "
             f"with regret minimizer {regret_minimizer.__name__} "
             f"and kwargs {solver_kwargs} "
             f"for {n_iter} iterations."
         )
 
     expl_values = []
-    game = pyspiel.load_game(game_name)
+    game = pyspiel.load_game(game)
     root_state = game.new_initial_state()
     all_infostates = set()
     uniform_joint_policy = dict()
@@ -59,7 +60,7 @@ def run(
 
     n_infostates = len(all_infostates)
 
-    solver = cfr_class(
+    solver = solver(
         root_state,
         regret_minimizer,
         verbose=do_print and not tqdm_print,
@@ -74,7 +75,7 @@ def run(
             else:
                 expl_print = " - "
             pbar.set_description(
-                f"Method:{cfr_class.__name__} | "
+                f"Method:{solver.__name__} | "
                 f"RM:{regret_minimizer.__name__} | "
                 f"kwargs:{solver_kwargs} | "
                 f"{expl_print}"
@@ -87,7 +88,7 @@ def run(
             expl_values.append(
                 exploitability.exploitability(
                     game,
-                    to_pyspiel_tab_policy(avg_policy, uniform_joint_policy),
+                    to_pyspiel_policy(avg_policy, uniform_joint_policy),
                 )
             )
 
@@ -97,9 +98,9 @@ def run(
                 print(
                     f"-------------------------------------------------------------"
                     f"--> Exploitability "
-                    f"{f'{expl_values[-1]: .5f}' if expl_values[-1] > 1e-5 else f'{expl_values[-1]: .3E}'}"
+                    f"{f'{expl_values[-1]: .5f}' if 1e-5 < expl_values[-1] < 1e7  else f'{expl_values[-1]: .3E}'}"
                 )
-                if game_name == "kuhn_poker":
+                if str(game) == "kuhn_poker()":
                     print_kuhn_poker_policy_profile(
                         normalize_policy_profile(avg_policy)
                     )
@@ -118,7 +119,7 @@ def run(
     avg_policy = solver.average_policy()
     if (
         (do_print or only_final_expl_print)
-        and game_name == "kuhn_poker"
+        and str(game) == "kuhn_poker()"
         and sum(map(lambda p: len(p), avg_policy)) == n_infostates
     ):
         print_final_policy_profile(solver.average_policy())
@@ -129,19 +130,19 @@ def run(
 if __name__ == "__main__":
     # n_iters = 10000
     n_iters = int(1e10)
-    for minimizer in (rm.AutoPredictiveRegretMatcher,):
+    for minimizer in (rm.RegretMatcher,):
         run(
-            cfr.CFRPlus,
+            cfr.CFRVanilla,
             n_iters,
             regret_minimizer=minimizer,
-            alternating=False,
+            alternating=True,
             do_print=False,
             tqdm_print=True,
             only_final_expl_print=False,
-            weighting_mode=cfr.OutcomeSamplingWeightingMode.lazy,
+            # weighting_mode=cfr.OutcomeSamplingWeightingMode.lazy,
             expl_threshold=1e-8,
             seed=0,
             # game_name="python_efce_example_efg",
-            game_name="kuhn_poker",
+            game="kuhn_poker",
             expl_check_freq=1,
         )

@@ -1,27 +1,17 @@
 import cmath
 import inspect
 import itertools
+import operator
 import warnings
+from abc import ABC, abstractmethod
 from enum import Enum
 from functools import reduce, singledispatchmethod
 from typing import Dict, List, Union, Any, Sequence, Mapping, Optional, Tuple
 
 import numpy as np
 import pyspiel
-import numba
 
-from cfrainbow.spiel_types import Infostate, Action, Probability
-
-
-class KuhnAction(Enum):
-    check = 0
-    bet = 1
-
-
-class LeducAction(Enum):
-    Fold = 0
-    Call = 1
-    Raise = 2
+from cfrainbow.spiel_types import Infostate, Action, Probability, Player
 
 
 def counterfactual_reach_prob(reach_prob_map: Mapping[int, float], player: int):
@@ -89,7 +79,7 @@ def all_states_gen(
 
 
 def terminal_states_gen(
-    root,
+    root: pyspiel.State,
 ):
     stack = [(root, 0)]
     while stack:
@@ -113,100 +103,7 @@ def infostates_gen(
         yield state.information_state_string(curr_player), curr_player, state, d
 
 
-class KuhnTensorToStr:
-    def __init__(self):
-        self.tensors = []
-        self.strs = []
-        for state, _ in all_states_gen(
-            root=pyspiel.load_game("kuhn_poker").new_initial_state()
-        ):
-            self.tensors.append(
-                tuple(state.information_state_tensor(state.current_player()))
-            )
-            self.strs.append(state.information_state_string(state.current_player()))
-
-    @singledispatchmethod
-    def __getitem__(self, istate):
-        raise NotImplementedError
-
-    @__getitem__.register(str)
-    def _(self, infostate_str):
-        where = self.strs.index(infostate_str)
-        return self.tensors[where]
-
-    @__getitem__.register(tuple)
-    def _(self, infostate_str):
-        where = self.tensors.index(infostate_str)
-        return self.strs[where]
-
-
-class KuhnLeducHistoryToStr:
-    def __init__(self, game_name: str = "kuhn_poker"):
-        self.tensors = []
-        self.strs = []
-        for state, _ in all_states_gen(
-            root=pyspiel.load_game(game_name).new_initial_state()
-        ):
-            self.tensors.append(tuple(self.istate_as_action_observation(state)))
-            self.strs.append(state.information_state_string(state.current_player()))
-
-    @staticmethod
-    def istate_as_action_observation(state: pyspiel.State):
-        history = list((entry.action, entry.player) for entry in state.full_history())
-        # in kuhn poker...
-        # the first action is the chance player assigning a card to player 0
-        # the second action is the chance player assigning a card to player 1
-        # depending on the active player, we have to hide the info given here of the other player's card
-        # we mask an unknown action as simply -1
-        if state.current_player() == 0:
-            entry_to_hide = history[1]
-            history[1] = -1, entry_to_hide[1]
-        else:
-            # active player is player 1
-            entry_to_hide = history[0]
-            history[0] = -1, entry_to_hide[1]
-        return history
-
-    @singledispatchmethod
-    def __getitem__(self, istate):
-        raise NotImplementedError
-
-    @__getitem__.register(str)
-    def _(self, infostate_str):
-        where = self.strs.index(infostate_str)
-        return self.tensors[where]
-
-    @__getitem__.register(tuple)
-    def _(self, infostate_str):
-        where = self.tensors.index(infostate_str)
-        return self.strs[where]
-
-
-kuhn_tensor_to_str_bij = KuhnTensorToStr()
-kuhn_history_to_str_bij = KuhnLeducHistoryToStr()
-leduc_history_to_str_bij = KuhnLeducHistoryToStr(game_name="leduc_poker")
-
-fill_len = len(f"P1: {'?'.center(5, ' ')} | P2: {'?'.center(5, ' ')} | c b ")
-kuhn_poker_infostate_translation = {
-    k: v.ljust(fill_len, " ")
-    for k, v in {
-        ("0", 0): f"P1: Jack  | P2: {'?'.center(5, ' ')}",
-        ("1", 0): f"P1: Queen | P2: {'?'.center(5, ' ')}",
-        ("2", 0): f"P1: King  | P2: {'?'.center(5, ' ')}",
-        ("0pb", 0): f"P1: Jack  | P2: {'?'.center(5, ' ')} | cb",
-        ("1pb", 0): f"P1: Queen | P2: {'?'.center(5, ' ')} | cb",
-        ("2pb", 0): f"P1: King  | P2: {'?'.center(5, ' ')} | cb",
-        ("0p", 1): f"P1: {'?'.center(5, ' ')} | P2: Jack  | c",
-        ("1p", 1): f"P1: {'?'.center(5, ' ')} | P2: Queen | c",
-        ("2p", 1): f"P1: {'?'.center(5, ' ')} | P2: King  | c",
-        ("0b", 1): f"P1: {'?'.center(5, ' ')} | P2: Jack  | b",
-        ("1b", 1): f"P1: {'?'.center(5, ' ')} | P2: Queen | b",
-        ("2b", 1): f"P1: {'?'.center(5, ' ')} | P2: King  | b",
-    }.items()
-}
-
-
-def to_pyspiel_tab_policy(
+def to_pyspiel_policy(
     policy_list,
     default_policy: Optional[
         Dict[
@@ -214,7 +111,7 @@ def to_pyspiel_tab_policy(
             List[Tuple[Action, Probability]],
         ]
     ] = None,
-):
+) -> pyspiel.TabularPolicy:
     joint_policy = {
         istate: [
             (action, prob / max(1e-8, sum(as_and_ps.values())))
@@ -247,20 +144,6 @@ def sample_on_policy(
     return values[choice], choice, policy
 
 
-def print_kuhn_poker_policy_profile(policy_profile: List[Dict[str, Dict[int, float]]]):
-    for player, player_policy in enumerate(policy_profile):
-        print("Player".upper(), player + 1)
-        for infostate, action_policy in player_policy.items():
-            print(
-                kuhn_poker_infostate_translation[(infostate, player)],
-                "-->",
-                list(
-                    f"{KuhnAction(action).name}: {prob: .3f}"
-                    for action, prob in action_policy.items()
-                ),
-            )
-
-
 def normalize_action_policy(action_policy):
     norm_action_policy = {}
     prob_sum = sum(action_policy.values())
@@ -287,6 +170,117 @@ def normalize_policy_profile(policy_profile):
     return norm_policy_profile
 
 
+class PolicyPrinter(ABC):
+    def print_profile(
+        self,
+        policy_profile: Union[
+            Dict[Player, Dict[Infostate, Dict[Action, Probability]]],
+            Dict[Player, pyspiel.TabularPolicy],
+        ],
+    ):
+        prints = []
+        policy_profile = sorted(policy_profile.items(), key=operator.itemgetter(0))
+        for player, policy in policy_profile:
+            if isinstance(policy, pyspiel.TabularPolicy):
+                policy = policy.policy_table()
+            prints.append(f"PLAYER {player + 1}:\n{self.print_policy(player, policy)}")
+        return prints
+
+    @abstractmethod
+    def print_policy(
+        self,
+        player: Player,
+        policy: Union[
+            Dict[Infostate, Dict[Action, Probability]],
+            pyspiel.TabularPolicy,
+        ],
+    ) -> str:
+        raise NotImplementedError(
+            f"{self.print_policy.__name__} has not been implemented."
+        )
+
+
+_fill_len = len(f"P1: {'?'.center(5, ' ')} | P2: {'?'.center(5, ' ')} | c b ")
+_kuhn_poker_infostate_translation = {
+    k: v.ljust(_fill_len, " ")
+    for k, v in {
+        ("0", 0): f"P1: Jack  | P2: {'?'.center(5, ' ')}",
+        ("1", 0): f"P1: Queen | P2: {'?'.center(5, ' ')}",
+        ("2", 0): f"P1: King  | P2: {'?'.center(5, ' ')}",
+        ("0pb", 0): f"P1: Jack  | P2: {'?'.center(5, ' ')} | cb",
+        ("1pb", 0): f"P1: Queen | P2: {'?'.center(5, ' ')} | cb",
+        ("2pb", 0): f"P1: King  | P2: {'?'.center(5, ' ')} | cb",
+        ("0p", 1): f"P1: {'?'.center(5, ' ')} | P2: Jack  | c",
+        ("1p", 1): f"P1: {'?'.center(5, ' ')} | P2: Queen | c",
+        ("2p", 1): f"P1: {'?'.center(5, ' ')} | P2: King  | c",
+        ("0b", 1): f"P1: {'?'.center(5, ' ')} | P2: Jack  | b",
+        ("1b", 1): f"P1: {'?'.center(5, ' ')} | P2: Queen | b",
+        ("2b", 1): f"P1: {'?'.center(5, ' ')} | P2: King  | b",
+    }.items()
+}
+
+
+class PokerPolicyPrinter(PolicyPrinter):
+    @classmethod
+    @abstractmethod
+    def action_name(cls, action: Action) -> str:
+        raise NotImplementedError(
+            f"{cls.action_name.__name__} has not been implemented."
+        )
+
+    def print_policy(
+        self,
+        player: Player,
+        policy: Union[
+            Dict[Infostate, Dict[Action, Probability]],
+            pyspiel.TabularPolicy,
+        ],
+    ) -> str:
+        out = []
+        for infostate, action_policy in policy.items():
+            out.append(
+                f"{_kuhn_poker_infostate_translation[(infostate, player)]} "
+                f"--> "
+                f"{list(f'{self.action_name(action)}: {prob: .3f}' for action, prob in action_policy.items())}"
+            )
+        return "\n".join(out)
+
+
+class KuhnPolicyPrinter(PokerPolicyPrinter):
+    class KuhnAction(Enum):
+        check = 0
+        bet = 1
+
+    @classmethod
+    def action_name(cls, action: Action) -> str:
+        return cls.KuhnAction(action).name
+
+
+class LeducPolicyPrinter(PokerPolicyPrinter):
+    class LeducAction(Enum):
+        Fold = 0
+        Call = 1
+        Raise = 2
+
+    @classmethod
+    def action_name(cls, action: Action) -> str:
+        return cls.LeducAction(action).name
+
+
+def print_kuhn_poker_policy_profile(policy_profile: List[Dict[str, Dict[int, float]]]):
+    for player, player_policy in enumerate(policy_profile):
+        print("Player".upper(), player + 1)
+        for infostate, action_policy in player_policy.items():
+            print(
+                _kuhn_poker_infostate_translation[(infostate, player)],
+                "-->",
+                list(
+                    f"{KuhnAction(action).name}: {prob: .3f}"
+                    for action, prob in action_policy.items()
+                ),
+            )
+
+
 def print_final_policy_profile(policy_profile):
     alpha = policy_profile[0]["0"][1] / sum(policy_profile[0]["0"].values())
     if alpha > 1 / 3:
@@ -303,7 +297,7 @@ def print_final_policy_profile(policy_profile):
         print("Player".upper(), i + 1)
         for infostate, dist in player_policy.items():
             print(
-                kuhn_poker_infostate_translation[(infostate, i)],
+                _kuhn_poker_infostate_translation[(infostate, i)],
                 "-->",
                 list(
                     f"{KuhnAction(action).name}: {prob - optimal_for_alpha[i][infostate][action]: .2f}"

@@ -6,7 +6,7 @@ from tqdm import tqdm
 from cfrainbow import rm
 from cfrainbow.cfr import *
 from cfrainbow.cfr.cfr_base import CFRBase
-from cfrainbow.utils import all_states_gen, to_pyspiel_tab_policy
+from cfrainbow.utils import all_states_gen, to_pyspiel_policy
 from .utils import CircularList
 
 MAX_ITER = int(1e6)
@@ -137,7 +137,7 @@ def test_efg(
         if ((i + 1) % EXPL_INTERVAL) == 0:
             expl_value = pyspiel.exploitability(
                 game,
-                to_pyspiel_tab_policy(avg_policy, uniform_joint),
+                to_pyspiel_policy(avg_policy, uniform_joint),
             )
             expls.push(expl_value)
             if sum(expls) / WINDOW_SIZE < EXPL_THRESH:
