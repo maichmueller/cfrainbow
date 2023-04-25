@@ -21,6 +21,8 @@ NormalFormStrategySpace = Set[NormalFormPlan]
 SequenceFormPlan = NormalFormPlan
 # a sequence-form strategy is a distribution over sequence-form plans
 SequenceFormStrategy = NormalFormStrategy
+# a sequence-form strategy space is a set of sequence-form strategies
+SequenceFormStrategySpace = Set[NormalFormStrategy]
 
 
 class JointNormalFormPlan:

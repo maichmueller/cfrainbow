@@ -27,10 +27,9 @@ def plot_cfr_convergence(
 ):
     with plt.style.context("bmh"):
         max_iters = 0
-        plt.figure()
-        cmap = matplotlib.cm.get_cmap("tab20")
+        cmap = matplotlib.cm.get_cmap("tab10")
 
-        unpaired_algo_names = [
+        unpaired_algo_names = {
             [
                 full_algo_name
                 for full_algo_name in algorithm_to_expl_lists.keys()
@@ -43,23 +42,23 @@ def plot_cfr_convergence(
                 ]
             ).items()
             if count == 1
-        ]
+        }
         unpaired_algo_list = sorted(
             [(algo, algorithm_to_expl_lists.pop(algo)) for algo in unpaired_algo_names],
             key=operator.itemgetter(0),
         )
         algorithm_to_expl_lists = (
             sorted(list(algorithm_to_expl_lists.items()), key=operator.itemgetter(0))
-            + unpaired_algo_list
+            + list(unpaired_algo_list)
         )
         dash_pattern = matplotlib.rcParams["lines.dashed_pattern"]
-        linewidth = 1
+        linewidth = 1.
         x = np.arange(1, iters_run + 1)
-        fig, ax = plt.subplots(figsize=(8, 8))
+        fig, ax = plt.subplots(figsize=(8, 6))
         manual_legend_handles = []
         for i, (algo, expl_list) in enumerate(algorithm_to_expl_lists):
             max_iters = max(max_iters, len(expl_list))
-            linestyle = "--" if "(A)" in algo else "-"
+            linestyle = "--" if "(S)" in algo else "-"
             color = cmap(i)
             if len(expl_list) != 1:
                 iteration_counts = np.flip(
@@ -67,7 +66,9 @@ def plot_cfr_convergence(
                 )
                 iter_beginnings = iters_run - iteration_counts
                 freq_arr = np.asarray(
-                    sorted(Counter(iter_beginnings).items(), key=operator.itemgetter(0)),
+                    sorted(
+                        Counter(iter_beginnings).items(), key=operator.itemgetter(0)
+                    ),
                     dtype=float,
                 )
                 absolute_freq = np.cumsum(freq_arr, axis=0)[:, 1]
@@ -140,7 +141,7 @@ def plot_cfr_convergence(
                 segments = np.concatenate([points[:-1], points[1:]], axis=1)
                 if linestyle == "--":
                     lc = LineCollection(
-                        [s for i, s in enumerate(segments) if i % 19 > 7],
+                        [s for i, s in enumerate(segments) if i % 108 > 40],
                         linewidths=relative_freq_per_iter * linewidth,
                         color=color,
                         alpha=relative_freq_per_iter,
@@ -189,6 +190,7 @@ def plot_cfr_convergence(
 
         for i, (algo, expl_list) in enumerate(algorithm_to_expl_lists):
             color = cmap(i)
+            linestyle = "--" if "(S)" in algo else "-"
             if len(expl_list) == 1:
                 ax.plot(
                     x[iters_run - len(expl_list[0]) :],
@@ -203,15 +205,22 @@ def plot_cfr_convergence(
         ax.set_ylabel("Exploitability")
         ax.set_yscale("log", base=10)
         # ax.set_xscale("log", base=10)
-        ax.set_title(f"Convergence to Nash Equilibrium in {game_name}")
+        # ax.set_title(f"Convergence to Nash Equilibrium in {game_name}")
         manual_legend_handles.extend(ax.get_legend_handles_labels()[0])
         ax.legend(
             handles=manual_legend_handles,
-            loc="upper center",
-            bbox_to_anchor=(0.5, -0.1),
+
+            # put the legend down at the bottom
+            # loc="upper center",
+            # bbox_to_anchor=(0.5, -0.1),
+
+            # put the legend to the right of the plot
+            loc='center left',
+            bbox_to_anchor=(1, 0.5),
+
             fancybox=True,
             shadow=True,
-            ncol=4,
+            ncol=1,
         )
 
         if not save:
@@ -233,18 +242,18 @@ def run_wrapper(args):
 
 
 if __name__ == "__main__":
-    n_iters = 1000
+    n_iters = 10000
     verbose = False
     game = "kuhn_poker"
     rng = np.random.default_rng(0)
     stochastic_seeds = 10
     n_cpu = cpu_count()
-    filename = "testdata.pkl"
+    filename = "plot_kuhn_poker_data.pkl"
     if not os.path.exists(os.path.join(".", filename)):
         with Pool(processes=n_cpu) as pool:
             jobs = list(
                 {
-                    "CFR (A)": (
+                    "CFR": (
                         CFRVanilla,
                         n_iters,
                         {
@@ -254,47 +263,36 @@ if __name__ == "__main__":
                             "do_print": verbose,
                         },
                     ),
-                    "CFR (S)": (
-                        CFRVanilla,
-                        n_iters,
-                        {
-                            "game_name": game,
-                            "regret_minimizer": rm.RegretMatcher,
-                            "alternating": False,
-                            "do_print": verbose,
-                        },
-                    ),
-                    "Exp. CFR (A)": (
-                        ExponentialCFR,
-                        n_iters,
-                        {
-                            "game_name": game,
-                            "regret_minimizer": rm.RegretMatcher,
-                            "alternating": True,
-                            "do_print": verbose,
-                        },
-                    ),
-                    "Exp. CFR (S)": (
-                        ExponentialCFR,
-                        n_iters,
-                        {
-                            "game_name": game,
-                            "regret_minimizer": rm.RegretMatcher,
-                            "alternating": False,
-                            "do_print": verbose,
-                        },
-                    ),
-                    "Pure CFR (A)": (
-                        PureCFR,
-                        n_iters,
-                        {
-                            "game_name": game,
-                            "regret_minimizer": rm.RegretMatcher,
-                            "stochastic_solver": True,
-                            "alternating": True,
-                            "do_print": verbose,
-                        },
-                    ),
+                    # "CFR (S)": (
+                    #     CFRVanilla,
+                    #     n_iters,
+                    #     {
+                    #         "game_name": game,
+                    #         "regret_minimizer": rm.RegretMatcher,
+                    #         "alternating": False,
+                    #         "do_print": verbose,
+                    #     },
+                    # ),
+                    # "Exp. CFR (A)": (
+                    #     ExponentialCFR,
+                    #     n_iters,
+                    #     {
+                    #         "game_name": game,
+                    #         "regret_minimizer": rm.RegretMatcher,
+                    #         "alternating": True,
+                    #         "do_print": verbose,
+                    #     },
+                    # ),
+                    # "Exp. CFR (S)": (
+                    #     ExponentialCFR,
+                    #     n_iters,
+                    #     {
+                    #         "game_name": game,
+                    #         "regret_minimizer": rm.RegretMatcher,
+                    #         "alternating": False,
+                    #         "do_print": verbose,
+                    #     },
+                    # ),
                     "Pure CFR (S)": (
                         PureCFR,
                         n_iters,
@@ -302,22 +300,21 @@ if __name__ == "__main__":
                             "game_name": game,
                             "regret_minimizer": rm.RegretMatcher,
                             "stochastic_solver": True,
-                            "alternating": False,
-                            "do_print": verbose,
-                        },
-                    ),
-                    "OS-MCCFR (A)": (
-                        OutcomeSamplingMCCFR,
-                        n_iters,
-                        {
-                            "game_name": game,
-                            "regret_minimizer": rm.RegretMatcher,
-                            "stochastic_solver": True,
-                            "weighting_mode": 2,
                             "alternating": True,
                             "do_print": verbose,
                         },
                     ),
+                    # "Pure CFR (S)": (
+                    #     PureCFR,
+                    #     n_iters,
+                    #     {
+                    #         "game_name": game,
+                    #         "regret_minimizer": rm.RegretMatcher,
+                    #         "stochastic_solver": True,
+                    #         "alternating": False,
+                    #         "do_print": verbose,
+                    #     },
+                    # ),
                     "OS-MCCFR (S)": (
                         OutcomeSamplingMCCFR,
                         n_iters,
@@ -326,23 +323,24 @@ if __name__ == "__main__":
                             "regret_minimizer": rm.RegretMatcher,
                             "stochastic_solver": True,
                             "weighting_mode": 2,
-                            "alternating": False,
-                            "do_print": verbose,
-                        },
-                    ),
-                    "ES-MCCFR (A)": (
-                        ExternalSamplingMCCFR,
-                        n_iters,
-                        {
-                            "game_name": game,
-                            "regret_minimizer": rm.RegretMatcher,
-                            "stochastic_solver": True,
                             "alternating": True,
                             "do_print": verbose,
                         },
                     ),
-                    "CS-MCCFR (A)": (
-                        ChanceSamplingCFR,
+                    # "OS-MCCFR (S)": (
+                    #     OutcomeSamplingMCCFR,
+                    #     n_iters,
+                    #     {
+                    #         "game_name": game,
+                    #         "regret_minimizer": rm.RegretMatcher,
+                    #         "stochastic_solver": True,
+                    #         "weighting_mode": 2,
+                    #         "alternating": False,
+                    #         "do_print": verbose,
+                    #     },
+                    # ),
+                    "ES-MCCFR (S)": (
+                        ExternalSamplingMCCFR,
                         n_iters,
                         {
                             "game_name": game,
@@ -359,17 +357,31 @@ if __name__ == "__main__":
                             "game_name": game,
                             "regret_minimizer": rm.RegretMatcher,
                             "stochastic_solver": True,
-                            "alternating": False,
+                            "alternating": True,
                             "do_print": verbose,
                         },
                     ),
-                    "CFR+ (A)": (
+                    # "CS-MCCFR (S)": (
+                    #     ChanceSamplingCFR,
+                    #     n_iters,
+                    #     {
+                    #         "game_name": game,
+                    #         "regret_minimizer": rm.RegretMatcher,
+                    #         "stochastic_solver": True,
+                    #         "alternating": False,
+                    #         "do_print": verbose,
+                    #     },
+                    # ),
+                    "CFR+": (
                         CFRPlus,
                         n_iters,
-                        {"game_name": game,
-                            "regret_minimizer": rm.RegretMatcherPlus, "do_print": verbose},
+                        {
+                            "game_name": game,
+                            "regret_minimizer": rm.RegretMatcherPlus,
+                            "do_print": verbose,
+                        },
                     ),
-                    "Disc. CFR (A)": (
+                    "Disc. CFR": (
                         DiscountedCFR,
                         n_iters,
                         {
@@ -379,37 +391,37 @@ if __name__ == "__main__":
                             "do_print": verbose,
                         },
                     ),
-                    "Disc. CFR (S)": (
-                        DiscountedCFR,
-                        n_iters,
-                        {
-                            "game_name": game,
-                            "regret_minimizer": rm.RegretMatcherDiscounted,
-                            "alternating": False,
-                            "do_print": verbose,
-                        },
-                    ),
-                    "Disc. CFR+ (A)": (
-                        DiscountedCFR,
-                        n_iters,
-                        {
-                            "game_name": game,
-                            "alternating": True,
-                            "regret_minimizer": rm.RegretMatcherDiscountedPlus,
-                            "do_print": verbose,
-                        },
-                    ),
-                    "Disc. CFR+ (S)": (
-                        DiscountedCFR,
-                        n_iters,
-                        {
-                            "game_name": game,
-                            "alternating": False,
-                            "regret_minimizer": rm.RegretMatcherDiscountedPlus,
-                            "do_print": verbose,
-                        },
-                    ),
-                    "Lin. CFR (A)": (
+                    # "Disc. CFR (S)": (
+                    #     DiscountedCFR,
+                    #     n_iters,
+                    #     {
+                    #         "game_name": game,
+                    #         "regret_minimizer": rm.RegretMatcherDiscounted,
+                    #         "alternating": False,
+                    #         "do_print": verbose,
+                    #     },
+                    # ),
+                    # "Disc. CFR+ (A)": (
+                    #     DiscountedCFR,
+                    #     n_iters,
+                    #     {
+                    #         "game_name": game,
+                    #         "alternating": True,
+                    #         "regret_minimizer": rm.RegretMatcherDiscountedPlus,
+                    #         "do_print": verbose,
+                    #     },
+                    # ),
+                    # "Disc. CFR+ (S)": (
+                    #     DiscountedCFR,
+                    #     n_iters,
+                    #     {
+                    #         "game_name": game,
+                    #         "alternating": False,
+                    #         "regret_minimizer": rm.RegretMatcherDiscountedPlus,
+                    #         "do_print": verbose,
+                    #     },
+                    # ),
+                    "Lin. CFR": (
                         LinearCFR,
                         n_iters,
                         {
@@ -419,33 +431,43 @@ if __name__ == "__main__":
                             "do_print": verbose,
                         },
                     ),
-                    "Lin. CFR (S)": (
-                        LinearCFR,
+                    # "Lin. CFR (S)": (
+                    #     LinearCFR,
+                    #     n_iters,
+                    #     {
+                    #         "game_name": game,
+                    #         "regret_minimizer": rm.RegretMatcherDiscounted,
+                    #         "alternating": False,
+                    #         "do_print": verbose,
+                    #     },
+                    # ),
+                    # "Lin. CFR+ (A)": (
+                    #     LinearCFR,
+                    #     n_iters,
+                    #     {
+                    #         "game_name": game,
+                    #         "regret_minimizer": rm.RegretMatcherDiscountedPlus,
+                    #         "alternating": True,
+                    #         "do_print": verbose,
+                    #     },
+                    # ),
+                    # "Lin. CFR+ (S)": (
+                    #     LinearCFR,
+                    #     n_iters,
+                    #     {
+                    #         "game_name": game,
+                    #         "regret_minimizer": rm.RegretMatcherDiscountedPlus,
+                    #         "alternating": False,
+                    #         "do_print": verbose,
+                    #     },
+                    # ),
+                    "PCFR+": (
+                        PredictiveCFRPlus,
                         n_iters,
                         {
                             "game_name": game,
-                            "regret_minimizer": rm.RegretMatcherDiscounted,
-                            "alternating": False,
-                            "do_print": verbose,
-                        },
-                    ),
-                    "Lin. CFR+ (A)": (
-                        LinearCFR,
-                        n_iters,
-                        {
-                            "game_name": game,
-                            "regret_minimizer": rm.RegretMatcherDiscountedPlus,
+                            "regret_minimizer": rm.AutoPredictiveRegretMatcherPlus,
                             "alternating": True,
-                            "do_print": verbose,
-                        },
-                    ),
-                    "Lin. CFR+ (S)": (
-                        LinearCFR,
-                        n_iters,
-                        {
-                            "game_name": game,
-                            "regret_minimizer": rm.RegretMatcherDiscountedPlus,
-                            "alternating": False,
                             "do_print": verbose,
                         },
                     ),
@@ -487,7 +509,7 @@ if __name__ == "__main__":
         with open(os.path.join(".", filename), "rb") as file:
             expl_dict = pickle.load(file)
     averaged_values = {
-        name: [running_mean(values, window_size=20) for values in expl_values]
+        name: [running_mean(values, window_size=100) for values in expl_values]
         for name, expl_values in expl_dict.items()
     }
     plot_cfr_convergence(

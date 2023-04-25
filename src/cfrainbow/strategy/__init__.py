@@ -3,7 +3,7 @@ from .space import (
     behaviour_to_nf_strategy,
     nf_plan_expected_payoff,
     nf_expected_payoff_table,
-    nf_strategy_space,
+    nf_space,
     reachable_terminal_states,
     reduced_nf_space,
     reduced_nf_space_gen,

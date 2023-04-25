@@ -2,6 +2,7 @@ import itertools
 from collections import defaultdict
 from copy import deepcopy
 from dataclasses import dataclass
+from enum import Enum
 from typing import (
     Sequence,
     Dict,
@@ -12,7 +13,8 @@ from typing import (
     Union,
     Mapping,
     Optional,
-    Generator, )
+    Generator,
+)
 import numpy as np
 import pyspiel
 from tqdm import tqdm
@@ -26,8 +28,9 @@ from cfrainbow.spiel_types import (
     Player,
     JointNormalFormPlan,
     JointNormalFormStrategy,
+    SequenceFormStrategySpace,
 )
-from cfrainbow.utils import all_states_gen, normalize_state_policy
+from cfrainbow.utils import all_states_gen, normalize_state_policy, SingletonMeta
 
 
 class DepthInformedSequence(NamedTuple):
@@ -69,9 +72,7 @@ class InformedActionList:
         return f"{self.infostate}, {self.actions}, {self.depth}"
 
 
-def nf_strategy_space(
-    game: pyspiel.Game, *players: Player
-) -> Dict[Player, Set[NormalFormPlan]]:
+def nf_space(game: pyspiel.Game, *players: Player) -> Dict[Player, Set[NormalFormPlan]]:
     if not players:
         players: List[int] = list(range(game.num_players()))
     action_spaces = {p: [] for p in players}
@@ -331,16 +332,20 @@ def nf_strategy_expected_payoff(
     payoff_table: Optional[Dict[JointNormalFormPlan, Sequence[float]]] = None,
 ):
     if payoff_table is None:
-        payoff_table = _KeyDependantDefaultDict(lambda joint_plan: nf_expected_payoff_table(game, joint_plan))
+        payoff_table = _KeyDependantDefaultDict(
+            lambda joint_plan: nf_expected_payoff_table(game, joint_plan)
+        )
     root = game.new_initial_state()
     expected_payoff = np.zeros(root.num_players())
     for joint_strategy in itertools.product(*joint_strategy.strategies):
-        j_prob = 1.
+        j_prob = 1.0
         j_plan = []
         for plan, prob in joint_strategy:
             j_prob *= prob
             j_plan.append(plan)
-        expected_payoff += j_prob * np.asarray(payoff_table[JointNormalFormPlan(j_plan)])
+        expected_payoff += j_prob * np.asarray(
+            payoff_table[JointNormalFormPlan(j_plan)]
+        )
 
     return expected_payoff
 
@@ -503,3 +508,41 @@ def terminal_reach_probabilities(
                 for action in state.legal_actions():
                     stack.append((state.child(action), reach_prob))
     return terminal_reach_prob
+
+
+@dataclass
+class DecisionSpace:
+    normal_form: Optional[Dict[Player, NormalFormStrategySpace]] = None
+    reduced_normal_form: Optional[Dict[Player, NormalFormStrategySpace]] = None
+    sequence_form: Optional[Dict[Player, SequenceFormStrategySpace]] = None
+
+
+class SpaceForm(Enum):
+    normal = 1
+    reduced_normal = 2
+    sequence = 3
+
+
+class MasterSpace(metaclass=SingletonMeta):
+    game_space: Dict[str, DecisionSpace] = defaultdict(lambda: DecisionSpace())
+
+    def __class_getitem__(
+        cls, game_token: Tuple[Union[pyspiel.Game, str], SpaceForm]
+    ) -> DecisionSpace:
+        game, token = game_token
+        space = cls.game_space[str(game)]
+        if getattr(space, token.name, None) is None:
+            if token == SpaceForm.normal:
+                new_space = nf_space(game, *game.players())
+            elif token == SpaceForm.reduced_normal:
+                new_space = reduced_nf_space(game, *game.players())
+            elif token == SpaceForm.sequence:
+                new_space = sequence_space(game, *game.players())
+            else:
+                raise ValueError(f"Unknown space token {token}.")
+            setattr(space, token.name, new_space)
+        return getattr(space, token.name)
+
+    @classmethod
+    def __contains__(cls, game: Union[pyspiel.Game, str]) -> bool:
+        return str(game) in cls.game_space
