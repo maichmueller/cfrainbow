@@ -78,14 +78,14 @@ For example, to use the Vanilla CFR algorithm:
 ```python
 
 import cfrainbow
-from cfrainbow import cfr
+from cfrainbow import cfr, rm
 import pyspiel
 
 cfrainbow.run(
   cfr.VanillaCFR, 
   n_iter=1000,
   game="kuhn_poker", 
-  regret_minimizer=cfr.rm.RegretMatcher
+  regret_minimizer=rm.RegretMatcher
 )
 ```
 For more detailed examples, please refer to the examples directory.
