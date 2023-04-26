@@ -81,7 +81,12 @@ import cfrainbow
 from cfrainbow import cfr
 import pyspiel
 
-cfrainbow.run(cfr.VanillaCFR, n_iter=1000, game="kuhn_poker", regret_minimizer=cfr.rm.RegretMatcher)
+cfrainbow.run(
+  cfr.VanillaCFR, 
+  n_iter=1000,
+  game="kuhn_poker", 
+  regret_minimizer=cfr.rm.RegretMatcher
+)
 ```
 For more detailed examples, please refer to the examples directory.
 
