@@ -266,8 +266,8 @@ def infostate_sequences(sequences: Dict[Tuple[Infostate, Action], SequenceAttr])
     # from each root infostate to the last infostate at which to act for this player.
     # The dictionary will list all combinations of each action at an infostate and each
     # possible immediate successor infostate following this action.
-    infostate_sequences = {s: [] for s in root_infostates}
-    for root_infostate, seq_list in infostate_sequences.items():
+    istate_sequences = {s: [] for s in root_infostates}
+    for root_infostate, seq_list in istate_sequences.items():
         stack = [(root_infostate, [], 0)]
         while stack:
             infostate, seq, depth = stack.pop()
@@ -284,12 +284,12 @@ def infostate_sequences(sequences: Dict[Tuple[Infostate, Action], SequenceAttr])
                     )
                 else:
                     seq_list.append(seq_copy)
-    return infostate_sequences
+    return istate_sequences
 
 
 def nf_plan_expected_payoff(
-    game: pyspiel.Game,
-    joint_plan: Union[JointNormalFormPlan, Dict[Infostate, Action], NormalFormPlan],
+        game: pyspiel.Game,
+        joint_plan: Union[JointNormalFormPlan, Dict[Infostate, Action], NormalFormPlan],
 ):
     if isinstance(joint_plan, JointNormalFormPlan):
         joint_plan = {
@@ -366,25 +366,26 @@ def nf_expected_payoff_table(
 
 
 def reachable_terminal_states(
-    game: pyspiel.Game,
-    players: Optional[Sequence[Player]] = None,
-    plans: Optional[Mapping[Player, Set[NormalFormPlan]]] = None,
-    use_progressbar: bool = False,
+        game: pyspiel.Game,
+        players: Optional[Sequence[Player]] = None,
+        plans: Optional[Mapping[Player, Set[NormalFormPlan]]] = None,
+        use_progressbar: bool = False,
 ):
     if players is None:
         players = list(range(game.num_players()))
     if plans is None:
         plans = reduced_nf_space(game, *players)
 
+    if use_progressbar:
+        tqdm_opt = tqdm
+    else:
+        tqdm_opt = lambda *args, **kwargs: args[0]
+
     reachable_labels_map: Dict[NormalFormPlan, List[str]] = dict()
     for player in players:
-        for plan in (
-            tqdm(
+        for plan in tqdm_opt(
                 plans[player],
                 desc=f"Finding reachable terminal states for player {player}",
-            )
-            if use_progressbar
-            else plans[player]
         ):
             reachable_labels_map.setdefault(plan, [])
             # convert to dictionary for faster lookups

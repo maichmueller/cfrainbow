@@ -82,7 +82,7 @@ class SamplingCFR(PureCFR):
         # increment the average policy for the player
         self._avg_policy_at(curr_player, infostate)[sampled_action] += 1
 
-        action_values = self._action_value_map(infostate)
+        action_values = dict()
         for action in actions:
             child_reach_prob = deepcopy(reach_prob)
             child_reach_prob[action] *= action == sampled_action
