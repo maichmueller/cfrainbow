@@ -14,7 +14,7 @@ from collections import Counter, defaultdict
 from multiprocessing import Pool, cpu_count
 
 from cfrainbow import rm
-from cfrainbow.main import main
+from cfrainbow.main import run
 from cfrainbow.cfr import *
 
 
@@ -227,16 +227,15 @@ def running_mean(values, window_size: int = 10):
     ]
 
 
-def main_wrapper(args):
+def run_wrapper(args):
     name, pos_args, kwargs = args
-    return name, main(*pos_args, **kwargs)
+    return name, run(*pos_args, **kwargs)
 
 
 if __name__ == "__main__":
     n_iters = 1000
     verbose = False
     game = "kuhn_poker"
-    # game = "leduc_poker"
     rng = np.random.default_rng(0)
     stochastic_seeds = 10
     n_cpu = cpu_count()
@@ -465,7 +464,7 @@ if __name__ == "__main__":
                 else:
                     augmented_jobs.append((alg, args))
             results = pool.imap_unordered(
-                main_wrapper,
+                run_wrapper,
                 (
                     (name, args_and_kwargs[:-1], args_and_kwargs[-1])
                     for (name, args_and_kwargs) in augmented_jobs
