@@ -18,7 +18,7 @@ from cfrainbow.utils import (
     slice_kwargs,
     load_game,
     PolicyPrinter,
-    EmptyPolicyPrinter, KuhnPolicyPrinter,
+    KuhnPolicyPrinter,
 )
 
 
@@ -137,9 +137,8 @@ if __name__ == "__main__":
             regret_minimizer=minimizer,
             alternating=True,
             policy_printer=KuhnPolicyPrinter(),
-            progressbar=True,
+            # progressbar=True,
             final_expl_print=False,
-            # weighting_mode=cfr.OutcomeSamplingWeightingMode.lazy,
             expl_threshold=1e-8,
             seed=0,
             expl_check_freq=1,
