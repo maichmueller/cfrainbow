@@ -10,9 +10,12 @@
 <p align=center> Implementations Of <i>Counterfactual Regret Minimization</i> In Its Many Shapes & Colors
 
 CFRainbow provides implementations of the basic CFR algorithm and some of the improved variants of CFR
-for computing <b>Nash Equilibria</b> in the 2-player 0-sum case as well as <b>Correlated Equilibria</b> in the general-sum case. 
+for computing <b>Nash Equilibria</b> in the 2-player 0-sum case as well as <b>Correlated Equilibria</b> in the general-sum case.
+
 The pacakge is loosely built for modularity and general applicability by building on the Openspiel framework by Deepmind. CFRainbow is <b>not</b> built
-for performance and will not scale well to large game implementations. Most algorithms are implemented with basic python data structures. The package is early WIP.
+for performance and will not scale well to large game implementations. Most algorithms are implemented with basic python data structures. 
+
+The package is in the early WIP phase.
 
 ## Available Algorithms
 
