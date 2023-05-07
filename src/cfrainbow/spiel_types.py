@@ -66,9 +66,4 @@ class JointNormalFormStrategy:
         return repr(self.strategies)
 
 
-class NumbaTypes:
-    Action = nb.types.int32
-    Probability = nb.types.float64
-    Regret = nb.types.float64
-    Value = nb.types.float64
-    Infostate = nb.types.string
+

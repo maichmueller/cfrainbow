@@ -1,3 +1,4 @@
+from __future__ import annotations
 import cmath
 import inspect
 import itertools
@@ -7,7 +8,7 @@ from abc import ABC, abstractmethod
 from collections import defaultdict
 from enum import Enum
 from functools import reduce, singledispatchmethod
-from typing import Dict, List, Union, Any, Sequence, Mapping, Optional, Tuple
+from typing import Dict, List, Union, Any, Sequence, Mapping, Optional, Tuple, Type
 
 import numpy as np
 import pyspiel
@@ -147,7 +148,11 @@ def sample_on_policy(
     return values[choice], choice, policy
 
 
-def normalize_action_policy(action_policy):
+ActionPolicyHint = Union[Dict[Action, Probability], List[Tuple[Action, Probability]]]
+StatePolicyHint = Dict[Infostate, ActionPolicyHint]
+
+
+def normalize_action_policy(action_policy: ActionPolicyHint):
     norm_action_policy = {}
     prob_sum = sum(action_policy.values())
     if prob_sum <= 0:
@@ -157,7 +162,7 @@ def normalize_action_policy(action_policy):
     return norm_action_policy
 
 
-def normalize_state_policy(state_policy):
+def normalize_state_policy(state_policy: StatePolicyHint):
     norm_policy = {}
     for infostate, action_policy in state_policy.items():
         norm_action_policy = normalize_action_policy(action_policy)
@@ -165,29 +170,37 @@ def normalize_state_policy(state_policy):
     return norm_policy
 
 
-def normalize_policy_profile(policy_profile):
-    norm_policy_profile = []
-    for player, state_policy in enumerate(policy_profile):
+def normalize_policy_profile(
+    policy_profile: Union[Dict[Player, StatePolicyHint], List[StatePolicyHint]]
+):
+    norm_policy_profile = dict()
+    for player, state_policy in (
+        {player: policy for player, policy in enumerate(policy_profile)}
+        if isinstance(policy_profile, list)
+        else policy_profile
+    ).items():
         norm_action_policy = normalize_state_policy(state_policy)
-        norm_policy_profile.append(norm_action_policy)
+        norm_policy_profile[player] = norm_action_policy
     return norm_policy_profile
 
 
 class PolicyPrinter(ABC):
+    register: Dict[pyspiel.Game, Type[PolicyPrinter]]
+
     def print_profile(
         self,
         policy_profile: Union[
             Dict[Player, Dict[Infostate, Dict[Action, Probability]]],
             Dict[Player, pyspiel.TabularPolicy],
         ],
-    ):
+    ) -> str:
         prints = []
         policy_profile = sorted(policy_profile.items(), key=operator.itemgetter(0))
         for player, policy in policy_profile:
             if isinstance(policy, pyspiel.TabularPolicy):
                 policy = policy.policy_table()
             prints.append(f"PLAYER {player + 1}:\n{self.print_policy(player, policy)}")
-        return prints
+        return "\n".join(prints)
 
     @abstractmethod
     def print_policy(
@@ -201,6 +214,14 @@ class PolicyPrinter(ABC):
         raise NotImplementedError(
             f"{self.print_policy.__name__} has not been implemented."
         )
+
+
+class EmptyPolicyPrinter(PolicyPrinter):
+    def print_profile(self, *args, **kwargs) -> str:
+        return ""
+
+    def print_policy(self, *args, **kwargs) -> str:
+        return ""
 
 
 _fill_len = len(f"P1: {'?'.center(5, ' ')} | P2: {'?'.center(5, ' ')} | c b ")
@@ -224,6 +245,9 @@ _kuhn_poker_infostate_translation = {
 
 
 class PokerPolicyPrinter(PolicyPrinter):
+    def __init__(self, digits: int = 3):
+        self.digits = digits
+
     @classmethod
     @abstractmethod
     def action_name(cls, action: Action) -> str:
@@ -239,12 +263,20 @@ class PokerPolicyPrinter(PolicyPrinter):
             pyspiel.TabularPolicy,
         ],
     ) -> str:
+        if isinstance(policy, pyspiel.TabularPolicy):
+            policy = policy.policy_table()
+
         out = []
         for infostate, action_policy in policy.items():
+            action_policy = list(
+                action_policy.items()
+                if isinstance(action_policy, dict)
+                else action_policy
+            )
             out.append(
                 f"{_kuhn_poker_infostate_translation[(infostate, player)]} "
                 f"--> "
-                f"{list(f'{self.action_name(action)}: {prob: .3f}' for action, prob in action_policy.items())}"
+                f"{list(f'{self.action_name(action)}: {prob: .{self.digits}f}' for action, prob in action_policy)}"
             )
         return "\n".join(out)
 
@@ -270,45 +302,6 @@ class LeducPolicyPrinter(PokerPolicyPrinter):
         return cls.LeducAction(action).name
 
 
-def print_kuhn_poker_policy_profile(policy_profile: List[Dict[str, Dict[int, float]]]):
-    for player, player_policy in enumerate(policy_profile):
-        print("Player".upper(), player + 1)
-        for infostate, action_policy in player_policy.items():
-            print(
-                _kuhn_poker_infostate_translation[(infostate, player)],
-                "-->",
-                list(
-                    f"{KuhnAction(action).name}: {prob: .3f}"
-                    for action, prob in action_policy.items()
-                ),
-            )
-
-
-def print_final_policy_profile(policy_profile):
-    alpha = policy_profile[0]["0"][1] / sum(policy_profile[0]["0"].values())
-    if alpha > 1 / 3:
-        warnings.warn(f"{alpha=} is greater than 1/3")
-    else:
-        print(f"{alpha=:.2f}")
-    optimal_for_alpha = kuhn_optimal_policy(alpha)
-    normalized_policy_profile = normalize_policy_profile(policy_profile)
-    print_kuhn_poker_policy_profile(normalized_policy_profile)
-    print("\ntheoretically optimal policy:\n")
-    print_kuhn_poker_policy_profile(optimal_for_alpha)
-    print("\nDifference to theoretically optimal policy:\n")
-    for i, player_policy in enumerate(normalized_policy_profile):
-        print("Player".upper(), i + 1)
-        for infostate, dist in player_policy.items():
-            print(
-                _kuhn_poker_infostate_translation[(infostate, i)],
-                "-->",
-                list(
-                    f"{KuhnAction(action).name}: {prob - optimal_for_alpha[i][infostate][action]: .2f}"
-                    for action, prob in dist.items()
-                ),
-            )
-
-
 def slice_kwargs(given_kwargs, *func):
     possible_kwargs = set()
     for f in func:
@@ -332,3 +325,9 @@ class KeyDependantDefaultDict(defaultdict):
     def __missing__(self, key):
         self[key] = value = self.default_factory(key)
         return value
+
+
+def load_game(game: Union[pyspiel.Game, str]):
+    if isinstance(game, str):
+        game = pyspiel.load_game(game)
+    return game

@@ -47,12 +47,11 @@ def plot_cfr_convergence(
             [(algo, algorithm_to_expl_lists.pop(algo)) for algo in unpaired_algo_names],
             key=operator.itemgetter(0),
         )
-        algorithm_to_expl_lists = (
-            sorted(list(algorithm_to_expl_lists.items()), key=operator.itemgetter(0))
-            + list(unpaired_algo_list)
-        )
+        algorithm_to_expl_lists = sorted(
+            list(algorithm_to_expl_lists.items()), key=operator.itemgetter(0)
+        ) + list(unpaired_algo_list)
         dash_pattern = matplotlib.rcParams["lines.dashed_pattern"]
-        linewidth = 1.
+        linewidth = 1.0
         x = np.arange(1, iters_run + 1)
         fig, ax = plt.subplots(figsize=(8, 6))
         manual_legend_handles = []
@@ -179,8 +178,7 @@ def plot_cfr_convergence(
                     color=color,
                 )
                 manual_legend_handles.append(line)
-                #
-                fill_area_polygon = ax.fill_between(
+                ax.fill_between(
                     x_to_plot,
                     mean_to_plot - stderr_to_plot,
                     mean_to_plot + stderr_to_plot,
@@ -209,15 +207,12 @@ def plot_cfr_convergence(
         manual_legend_handles.extend(ax.get_legend_handles_labels()[0])
         ax.legend(
             handles=manual_legend_handles,
-
             # put the legend down at the bottom
             # loc="upper center",
             # bbox_to_anchor=(0.5, -0.1),
-
             # put the legend to the right of the plot
-            loc='center left',
+            loc="center left",
             bbox_to_anchor=(1, 0.5),
-
             fancybox=True,
             shadow=True,
             ncol=1,
@@ -241,6 +236,22 @@ def run_wrapper(args):
     return name, run(*pos_args, **kwargs)
 
 
+def augment_stochastic_runs(job_list):
+    augmented_jobs = []
+    for alg, args in job_list:
+        kwargs = args[-1]
+        if kwargs.pop("stochastic_solver", False):
+            augmented_jobs.extend(
+                [
+                    (alg, args[:-1] + (kwargs | {"seed": seed},))
+                    for seed in rng.integers(0, int(1e6), size=stochastic_seeds)
+                ]
+            )
+        else:
+            augmented_jobs.append((alg, args))
+    return augmented_jobs
+
+
 if __name__ == "__main__":
     n_iters = 10000
     verbose = False
@@ -251,251 +262,241 @@ if __name__ == "__main__":
     filename = "plot_kuhn_poker_data.pkl"
     if not os.path.exists(os.path.join(".", filename)):
         with Pool(processes=n_cpu) as pool:
-            jobs = list(
-                {
-                    "CFR": (
-                        CFRVanilla,
-                        n_iters,
-                        {
-                            "game_name": game,
-                            "regret_minimizer": rm.RegretMatcher,
-                            "alternating": True,
-                            "do_print": verbose,
-                        },
-                    ),
-                    # "CFR (S)": (
-                    #     CFRVanilla,
-                    #     n_iters,
-                    #     {
-                    #         "game_name": game,
-                    #         "regret_minimizer": rm.RegretMatcher,
-                    #         "alternating": False,
-                    #         "do_print": verbose,
-                    #     },
-                    # ),
-                    # "Exp. CFR (A)": (
-                    #     ExponentialCFR,
-                    #     n_iters,
-                    #     {
-                    #         "game_name": game,
-                    #         "regret_minimizer": rm.RegretMatcher,
-                    #         "alternating": True,
-                    #         "do_print": verbose,
-                    #     },
-                    # ),
-                    # "Exp. CFR (S)": (
-                    #     ExponentialCFR,
-                    #     n_iters,
-                    #     {
-                    #         "game_name": game,
-                    #         "regret_minimizer": rm.RegretMatcher,
-                    #         "alternating": False,
-                    #         "do_print": verbose,
-                    #     },
-                    # ),
-                    "Pure CFR (S)": (
-                        PureCFR,
-                        n_iters,
-                        {
-                            "game_name": game,
-                            "regret_minimizer": rm.RegretMatcher,
-                            "stochastic_solver": True,
-                            "alternating": True,
-                            "do_print": verbose,
-                        },
-                    ),
-                    # "Pure CFR (S)": (
-                    #     PureCFR,
-                    #     n_iters,
-                    #     {
-                    #         "game_name": game,
-                    #         "regret_minimizer": rm.RegretMatcher,
-                    #         "stochastic_solver": True,
-                    #         "alternating": False,
-                    #         "do_print": verbose,
-                    #     },
-                    # ),
-                    "OS-MCCFR (S)": (
-                        OutcomeSamplingMCCFR,
-                        n_iters,
-                        {
-                            "game_name": game,
-                            "regret_minimizer": rm.RegretMatcher,
-                            "stochastic_solver": True,
-                            "weighting_mode": 2,
-                            "alternating": True,
-                            "do_print": verbose,
-                        },
-                    ),
-                    # "OS-MCCFR (S)": (
-                    #     OutcomeSamplingMCCFR,
-                    #     n_iters,
-                    #     {
-                    #         "game_name": game,
-                    #         "regret_minimizer": rm.RegretMatcher,
-                    #         "stochastic_solver": True,
-                    #         "weighting_mode": 2,
-                    #         "alternating": False,
-                    #         "do_print": verbose,
-                    #     },
-                    # ),
-                    "ES-MCCFR (S)": (
-                        ExternalSamplingMCCFR,
-                        n_iters,
-                        {
-                            "game_name": game,
-                            "regret_minimizer": rm.RegretMatcher,
-                            "stochastic_solver": True,
-                            "alternating": True,
-                            "do_print": verbose,
-                        },
-                    ),
-                    "CS-MCCFR (S)": (
-                        ChanceSamplingCFR,
-                        n_iters,
-                        {
-                            "game_name": game,
-                            "regret_minimizer": rm.RegretMatcher,
-                            "stochastic_solver": True,
-                            "alternating": True,
-                            "do_print": verbose,
-                        },
-                    ),
-                    # "CS-MCCFR (S)": (
-                    #     ChanceSamplingCFR,
-                    #     n_iters,
-                    #     {
-                    #         "game_name": game,
-                    #         "regret_minimizer": rm.RegretMatcher,
-                    #         "stochastic_solver": True,
-                    #         "alternating": False,
-                    #         "do_print": verbose,
-                    #     },
-                    # ),
-                    "CFR+": (
-                        CFRPlus,
-                        n_iters,
-                        {
-                            "game_name": game,
-                            "regret_minimizer": rm.RegretMatcherPlus,
-                            "do_print": verbose,
-                        },
-                    ),
-                    "Disc. CFR": (
-                        DiscountedCFR,
-                        n_iters,
-                        {
-                            "game_name": game,
-                            "regret_minimizer": rm.RegretMatcherDiscounted,
-                            "alternating": True,
-                            "do_print": verbose,
-                        },
-                    ),
-                    # "Disc. CFR (S)": (
-                    #     DiscountedCFR,
-                    #     n_iters,
-                    #     {
-                    #         "game_name": game,
-                    #         "regret_minimizer": rm.RegretMatcherDiscounted,
-                    #         "alternating": False,
-                    #         "do_print": verbose,
-                    #     },
-                    # ),
-                    # "Disc. CFR+ (A)": (
-                    #     DiscountedCFR,
-                    #     n_iters,
-                    #     {
-                    #         "game_name": game,
-                    #         "alternating": True,
-                    #         "regret_minimizer": rm.RegretMatcherDiscountedPlus,
-                    #         "do_print": verbose,
-                    #     },
-                    # ),
-                    # "Disc. CFR+ (S)": (
-                    #     DiscountedCFR,
-                    #     n_iters,
-                    #     {
-                    #         "game_name": game,
-                    #         "alternating": False,
-                    #         "regret_minimizer": rm.RegretMatcherDiscountedPlus,
-                    #         "do_print": verbose,
-                    #     },
-                    # ),
-                    "Lin. CFR": (
-                        LinearCFR,
-                        n_iters,
-                        {
-                            "game_name": game,
-                            "regret_minimizer": rm.RegretMatcherDiscounted,
-                            "alternating": True,
-                            "do_print": verbose,
-                        },
-                    ),
-                    # "Lin. CFR (S)": (
-                    #     LinearCFR,
-                    #     n_iters,
-                    #     {
-                    #         "game_name": game,
-                    #         "regret_minimizer": rm.RegretMatcherDiscounted,
-                    #         "alternating": False,
-                    #         "do_print": verbose,
-                    #     },
-                    # ),
-                    # "Lin. CFR+ (A)": (
-                    #     LinearCFR,
-                    #     n_iters,
-                    #     {
-                    #         "game_name": game,
-                    #         "regret_minimizer": rm.RegretMatcherDiscountedPlus,
-                    #         "alternating": True,
-                    #         "do_print": verbose,
-                    #     },
-                    # ),
-                    # "Lin. CFR+ (S)": (
-                    #     LinearCFR,
-                    #     n_iters,
-                    #     {
-                    #         "game_name": game,
-                    #         "regret_minimizer": rm.RegretMatcherDiscountedPlus,
-                    #         "alternating": False,
-                    #         "do_print": verbose,
-                    #     },
-                    # ),
-                    "PCFR+": (
-                        PredictiveCFRPlus,
-                        n_iters,
-                        {
-                            "game_name": game,
-                            "regret_minimizer": rm.AutoPredictiveRegretMatcherPlus,
-                            "alternating": True,
-                            "do_print": verbose,
-                        },
-                    ),
-                }.items()
+            jobs = augment_stochastic_runs(
+                list(
+                    {
+                        "CFR": (
+                            CFRVanilla,
+                            n_iters,
+                            {
+                                "game_name": game,
+                                "regret_minimizer": rm.RegretMatcher,
+                                "alternating": True,
+                                "do_print": verbose,
+                            },
+                        ),
+                        "CFR (S)": (
+                            CFRVanilla,
+                            n_iters,
+                            {
+                                "game_name": game,
+                                "regret_minimizer": rm.RegretMatcher,
+                                "alternating": False,
+                                "do_print": verbose,
+                            },
+                        ),
+                        "Exp. CFR (A)": (
+                            ExponentialCFR,
+                            n_iters,
+                            {
+                                "game_name": game,
+                                "regret_minimizer": rm.RegretMatcher,
+                                "alternating": True,
+                                "do_print": verbose,
+                            },
+                        ),
+                        "Exp. CFR (S)": (
+                            ExponentialCFR,
+                            n_iters,
+                            {
+                                "game_name": game,
+                                "regret_minimizer": rm.RegretMatcher,
+                                "alternating": False,
+                                "do_print": verbose,
+                            },
+                        ),
+                        "Pure CFR (S)": (
+                            PureCFR,
+                            n_iters,
+                            {
+                                "game_name": game,
+                                "regret_minimizer": rm.RegretMatcher,
+                                "stochastic_solver": True,
+                                "alternating": True,
+                                "do_print": verbose,
+                            },
+                        ),
+                        "Pure CFR (S)": (
+                            PureCFR,
+                            n_iters,
+                            {
+                                "game_name": game,
+                                "regret_minimizer": rm.RegretMatcher,
+                                "stochastic_solver": True,
+                                "alternating": False,
+                                "do_print": verbose,
+                            },
+                        ),
+                        "OS-MCCFR (S)": (
+                            OutcomeSamplingMCCFR,
+                            n_iters,
+                            {
+                                "game_name": game,
+                                "regret_minimizer": rm.RegretMatcher,
+                                "stochastic_solver": True,
+                                "weighting_mode": 2,
+                                "alternating": True,
+                                "do_print": verbose,
+                            },
+                        ),
+                        "OS-MCCFR (S)": (
+                            OutcomeSamplingMCCFR,
+                            n_iters,
+                            {
+                                "game_name": game,
+                                "regret_minimizer": rm.RegretMatcher,
+                                "stochastic_solver": True,
+                                "weighting_mode": 2,
+                                "alternating": False,
+                                "do_print": verbose,
+                            },
+                        ),
+                        "ES-MCCFR (S)": (
+                            ExternalSamplingMCCFR,
+                            n_iters,
+                            {
+                                "game_name": game,
+                                "regret_minimizer": rm.RegretMatcher,
+                                "stochastic_solver": True,
+                                "alternating": True,
+                                "do_print": verbose,
+                            },
+                        ),
+                        "CS-MCCFR (S)": (
+                            ChanceSamplingCFR,
+                            n_iters,
+                            {
+                                "game_name": game,
+                                "regret_minimizer": rm.RegretMatcher,
+                                "stochastic_solver": True,
+                                "alternating": True,
+                                "do_print": verbose,
+                            },
+                        ),
+                        "CS-MCCFR (S)": (
+                            ChanceSamplingCFR,
+                            n_iters,
+                            {
+                                "game_name": game,
+                                "regret_minimizer": rm.RegretMatcher,
+                                "stochastic_solver": True,
+                                "alternating": False,
+                                "do_print": verbose,
+                            },
+                        ),
+                        "CFR+": (
+                            CFRPlus,
+                            n_iters,
+                            {
+                                "game_name": game,
+                                "regret_minimizer": rm.RegretMatcherPlus,
+                                "do_print": verbose,
+                            },
+                        ),
+                        "Disc. CFR": (
+                            DiscountedCFR,
+                            n_iters,
+                            {
+                                "game_name": game,
+                                "regret_minimizer": rm.RegretMatcherDiscounted,
+                                "alternating": True,
+                                "do_print": verbose,
+                            },
+                        ),
+                        "Disc. CFR (S)": (
+                            DiscountedCFR,
+                            n_iters,
+                            {
+                                "game_name": game,
+                                "regret_minimizer": rm.RegretMatcherDiscounted,
+                                "alternating": False,
+                                "do_print": verbose,
+                            },
+                        ),
+                        "Disc. CFR+ (A)": (
+                            DiscountedCFR,
+                            n_iters,
+                            {
+                                "game_name": game,
+                                "alternating": True,
+                                "regret_minimizer": rm.RegretMatcherDiscountedPlus,
+                                "do_print": verbose,
+                            },
+                        ),
+                        "Disc. CFR+ (S)": (
+                            DiscountedCFR,
+                            n_iters,
+                            {
+                                "game_name": game,
+                                "alternating": False,
+                                "regret_minimizer": rm.RegretMatcherDiscountedPlus,
+                                "do_print": verbose,
+                            },
+                        ),
+                        "Lin. CFR": (
+                            LinearCFR,
+                            n_iters,
+                            {
+                                "game_name": game,
+                                "regret_minimizer": rm.RegretMatcherDiscounted,
+                                "alternating": True,
+                                "do_print": verbose,
+                            },
+                        ),
+                        "Lin. CFR (S)": (
+                            LinearCFR,
+                            n_iters,
+                            {
+                                "game_name": game,
+                                "regret_minimizer": rm.RegretMatcherDiscounted,
+                                "alternating": False,
+                                "do_print": verbose,
+                            },
+                        ),
+                        "Lin. CFR+ (A)": (
+                            LinearCFR,
+                            n_iters,
+                            {
+                                "game_name": game,
+                                "regret_minimizer": rm.RegretMatcherDiscountedPlus,
+                                "alternating": True,
+                                "do_print": verbose,
+                            },
+                        ),
+                        "Lin. CFR+ (S)": (
+                            LinearCFR,
+                            n_iters,
+                            {
+                                "game_name": game,
+                                "regret_minimizer": rm.RegretMatcherDiscountedPlus,
+                                "alternating": False,
+                                "do_print": verbose,
+                            },
+                        ),
+                        "PCFR+": (
+                            PredictiveCFRPlus,
+                            n_iters,
+                            {
+                                "game_name": game,
+                                "regret_minimizer": rm.AutoPredictiveRegretMatcherPlus,
+                                "alternating": True,
+                                "do_print": verbose,
+                            },
+                        ),
+                    }.items()
+                )
             )
-            augmented_jobs = []
-            for alg, args in jobs:
-                kwargs = args[-1]
-                if kwargs.pop("stochastic_solver", False):
-                    augmented_jobs.extend(
-                        [
-                            (alg, args[:-1] + (kwargs | {"seed": seed},))
-                            for seed in rng.integers(0, int(1e6), size=stochastic_seeds)
-                        ]
-                    )
-                else:
-                    augmented_jobs.append((alg, args))
             results = pool.imap_unordered(
                 run_wrapper,
                 (
                     (name, args_and_kwargs[:-1], args_and_kwargs[-1])
-                    for (name, args_and_kwargs) in augmented_jobs
+                    for (name, args_and_kwargs) in jobs
                 ),
             )
             expl_dict = defaultdict(list)
 
             with tqdm(
-                total=len(augmented_jobs),
+                total=len(jobs),
                 desc=f"Running CFR variants in multiprocess on {n_cpu} cpus",
             ) as pbar:
                 for result in results:
@@ -508,6 +509,7 @@ if __name__ == "__main__":
     else:
         with open(os.path.join(".", filename), "rb") as file:
             expl_dict = pickle.load(file)
+
     averaged_values = {
         name: [running_mean(values, window_size=100) for values in expl_values]
         for name, expl_values in expl_dict.items()

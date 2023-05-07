@@ -16,3 +16,5 @@ wandb/
 poetry.lock
 
 .tox/
+
+bench.py
