@@ -4,12 +4,15 @@ import itertools
 import operator
 import warnings
 from abc import ABC, abstractmethod
+from collections import defaultdict
 from enum import Enum
 from functools import reduce, singledispatchmethod
 from typing import Dict, List, Union, Any, Sequence, Mapping, Optional, Tuple
 
 import numpy as np
 import pyspiel
+
+import threading
 
 from cfrainbow.spiel_types import Infostate, Action, Probability, Player
 
@@ -311,3 +314,21 @@ def slice_kwargs(given_kwargs, *func):
     for f in func:
         possible_kwargs = possible_kwargs.union(inspect.signature(f).parameters)
     return {k: v for k, v in given_kwargs.items() if k in possible_kwargs}
+
+
+class SingletonMeta(type):
+    _instances = {}
+    _lock = threading.Lock()
+
+    def __call__(cls, *args, **kwargs):
+        with cls._lock:
+            if cls not in cls._instances:
+                instance = super().__call__(*args, **kwargs)
+                cls._instances[cls] = instance
+        return cls._instances[cls]
+
+
+class KeyDependantDefaultDict(defaultdict):
+    def __missing__(self, key):
+        self[key] = value = self.default_factory(key)
+        return value

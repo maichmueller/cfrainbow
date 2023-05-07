@@ -30,7 +30,12 @@ from cfrainbow.spiel_types import (
     JointNormalFormStrategy,
     SequenceFormStrategySpace,
 )
-from cfrainbow.utils import all_states_gen, normalize_state_policy, SingletonMeta
+from cfrainbow.utils import (
+    all_states_gen,
+    normalize_state_policy,
+    SingletonMeta,
+    KeyDependantDefaultDict,
+)
 
 
 class DepthInformedSequence(NamedTuple):
@@ -288,8 +293,8 @@ def infostate_sequences(sequences: Dict[Tuple[Infostate, Action], SequenceAttr])
 
 
 def nf_plan_expected_payoff(
-        game: pyspiel.Game,
-        joint_plan: Union[JointNormalFormPlan, Dict[Infostate, Action], NormalFormPlan],
+    game: pyspiel.Game,
+    joint_plan: Union[JointNormalFormPlan, Dict[Infostate, Action], NormalFormPlan],
 ):
     if isinstance(joint_plan, JointNormalFormPlan):
         joint_plan = {
@@ -320,19 +325,13 @@ def nf_plan_expected_payoff(
     return expected_payoff
 
 
-class _KeyDependantDefaultDict(defaultdict):
-    def __missing__(self, key):
-        self[key] = value = self.default_factory(key)
-        return value
-
-
 def nf_strategy_expected_payoff(
     game: pyspiel.Game,
     joint_strategy: JointNormalFormStrategy,
     payoff_table: Optional[Dict[JointNormalFormPlan, Sequence[float]]] = None,
 ):
     if payoff_table is None:
-        payoff_table = _KeyDependantDefaultDict(
+        payoff_table = KeyDependantDefaultDict(
             lambda joint_plan: nf_expected_payoff_table(game, joint_plan)
         )
     root = game.new_initial_state()
@@ -366,10 +365,10 @@ def nf_expected_payoff_table(
 
 
 def reachable_terminal_states(
-        game: pyspiel.Game,
-        players: Optional[Sequence[Player]] = None,
-        plans: Optional[Mapping[Player, Set[NormalFormPlan]]] = None,
-        use_progressbar: bool = False,
+    game: pyspiel.Game,
+    players: Optional[Sequence[Player]] = None,
+    plans: Optional[Mapping[Player, Set[NormalFormPlan]]] = None,
+    use_progressbar: bool = False,
 ):
     if players is None:
         players = list(range(game.num_players()))
@@ -384,11 +383,11 @@ def reachable_terminal_states(
     reachable_labels_map: Dict[NormalFormPlan, List[str]] = dict()
     for player in players:
         for plan in tqdm_opt(
-                plans[player],
-                desc=f"Finding reachable terminal states for player {player}",
+            plans[player],
+            desc=f"Finding reachable terminal states for player {player}",
         ):
             reachable_labels_map.setdefault(plan, [])
-            # convert to dictionary for faster lookups
+            # convert to dictionary for simpler lookups
             plan_dict = {infostate: action for infostate, action in plan}
 
             stack = [game.new_initial_state()]
@@ -464,7 +463,6 @@ def nf_to_behaviour_strategy(
         Player, Sequence[Tuple[NormalFormPlan, Probability]]
     ],
 ) -> Dict[Player, Dict[Infostate, Dict[Action, Probability]]]:
-
     behaviour_strategies_out = dict()
     for player in players:
         behavioural_strategy = dict()
