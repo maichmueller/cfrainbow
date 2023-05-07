@@ -12,7 +12,7 @@
 CFRainbow provides implementations of the basic CFR algorithm and some of the improved variants of CFR
 for computing <b>Nash Equilibria</b> in the 2-player 0-sum case as well as <b>Correlated Equilibria</b> in the general-sum case. 
 The pacakge is loosely built for modularity and general applicability by building on the Openspiel framework by Deepmind. CFRainbow is <b>not</b> built
-for performance and will not scale well to large game implementations. Most algorithms are implemented with basic python data structures.
+for performance and will not scale well to large game implementations. Most algorithms are implemented with basic python data structures. The package is early WIP.
 
 ## Available Algorithms
 
@@ -37,9 +37,30 @@ and those that are planned to be implemented in the future (📅):
 
 # Installation
 
+### <b> Source Install </b>
+
+To install CFRainbow from master, please follow these steps:
+
+```bash
+git clone https://github.com/yourusername/cfrainbow.git
+cd cfrainbow
+```
+and install the package with pip
+```bash
+pip install .
+```
+or poetry
+```bash
+poetry install
+```
+use the option `--no-dev` to ensure a non-editable installation.
+
+
+### <b> Web Install </b>
+
 <b> Pip </b>
 
-To install CFRainbow using pip, run the following command:
+To install CFRainbow from PyPi using pip, run the following command:
 ```bash
 pip install cfrainbow
 ```
@@ -59,20 +80,9 @@ Then run:
 poetry install
 ```
 
-<b> Source Install </b>
+# Usage
 
-To install CFRainbow from master, please follow these steps:
-
-Clone the repository:
-```bash
-git clone https://github.com/yourusername/cfrainbow.git
-cd cfrainbow
-pip install .
-```
-
-Usage
-
-To use CFRainbow, import the desired algorithm from the package and call its solve_game method with a game as input.
+To use CFRainbow, import the desired algorithm from the package, a regret minimizer, and the `run` method with a game(-name) as input.
 For example, to use the Vanilla CFR algorithm:
 
 ```python
@@ -88,6 +98,6 @@ cfrainbow.run(
   regret_minimizer=rm.RegretMatcher
 )
 ```
-For more detailed examples, please refer to the examples directory.
+For more detailed examples, please refer to the examples directory (wip).
 
 
