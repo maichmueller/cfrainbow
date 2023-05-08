@@ -1,6 +1,4 @@
 import inspect
-import operator
-from functools import reduce
 from typing import Optional, Type, Union
 
 import pyspiel
@@ -12,13 +10,13 @@ import cfrainbow.rm as rm
 from cfrainbow.cfr.cfr_base import CFRBase
 
 from cfrainbow.utils import (
-    all_states_gen,
     to_pyspiel_policy,
     normalize_policy_profile,
     slice_kwargs,
     load_game,
     PolicyPrinter,
     KuhnPolicyPrinter,
+    make_uniform_policy,
 )
 
 
@@ -50,17 +48,8 @@ def run(
     expl_values = []
     game = load_game(game)
     root_state = game.new_initial_state()
-    all_infostates = set()
-    uniform_joint_policy = dict()
-    for state, _ in all_states_gen(root=root_state.clone()):
-        infostate = state.information_state_string(state.current_player())
-        actions = state.legal_actions()
-        all_infostates.add(infostate)
-        uniform_joint_policy[infostate] = [
-            (action, 1.0 / len(actions)) for action in actions
-        ]
-
-    n_infostates = len(all_infostates)
+    uniform_joint_policy = make_uniform_policy(root_state)
+    n_infostates = len(uniform_joint_policy)
 
     solver_obj = solver(
         root_state,
@@ -128,7 +117,6 @@ def run(
 
 if __name__ == "__main__":
     n_iters = 10000
-    # n_iters = int(1e10)
     for minimizer in (rm.RegretMatcher,):
         run(
             cfr.CFRVanilla,

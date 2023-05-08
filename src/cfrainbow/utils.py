@@ -51,17 +51,16 @@ def kuhn_optimal_policy(alpha: float):
 
 
 def all_states_gen(
-    root=None,
+    root: Optional[pyspiel.State] = None,
     include_chance_states: bool = False,
     include_terminal_states: bool = False,
     *,
     depth: int = cmath.inf,
-    game: Union[pyspiel.Game, str] = "kuhn_poker",
+    game: Optional[Union[pyspiel.Game, str]] = None,
 ):
     if root is None:
-        root = (
-            pyspiel.load_game(game) if isinstance(game, str) else game
-        ).new_initial_state()
+        assert game is not None
+        root = load_game(game).new_initial_state()
     stack = [(root, 0)]
     while stack:
         s, d = stack.pop()
@@ -327,7 +326,20 @@ class KeyDependantDefaultDict(defaultdict):
         return value
 
 
-def load_game(game: Union[pyspiel.Game, str]):
+def load_game(game: Union[pyspiel.Game, str]) -> pyspiel.Game:
     if isinstance(game, str):
         game = pyspiel.load_game(game)
     return game
+
+
+def make_uniform_policy(root_state_or_game: Union[pyspiel.State, pyspiel.Game, str]):
+    if isinstance(root_state_or_game, (pyspiel.Game, str)):
+        root_state_or_game = load_game(root_state_or_game).new_initial_state()
+
+    uniform_joint_policy = dict()
+    for state, _ in all_states_gen(root=root_state_or_game):
+        actions = state.legal_actions()
+        uniform_joint_policy[state.information_state_string(state.current_player())] = [
+            (action, 1.0 / len(actions)) for action in actions
+        ]
+    return uniform_joint_policy
