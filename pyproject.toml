@@ -51,6 +51,26 @@ tqdm = "*"
 numba = { version = ">=0.5" }
 
 [tool.poetry.group.dev.dependencies]
+pre-commit = "*"
+tox = "*"
 pytest = "*"
 pytest-xdist = "*"
 pytest-cov = "*"
+
+
+[tool.black]
+line-length = 79
+include = '\.pyi?$'
+exclude = '''
+/(
+    \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | _build
+  | buck-out
+  | build
+  | dist
+)/
+'''

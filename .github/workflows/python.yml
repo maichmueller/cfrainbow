@@ -77,7 +77,7 @@ jobs:
           PATH: "$HOME/.poetry/bin:$PATH"
       - name: Run tox with coverage
         run: |
-          poetry run tox -e py${{ matrix.config.tox }} -- -n auto --cov=.
+          tox -e py${{ matrix.config.tox }} -- -n auto --cov=.
         env:
           PATH: "$HOME/.poetry/bin:$PATH"
       - name: Upload coverage reports to Codecov
