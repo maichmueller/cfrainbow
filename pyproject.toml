@@ -59,7 +59,6 @@ pytest-cov = "*"
 
 
 [tool.black]
-include = '\.pyi?$'
 exclude = '''
 /(
     \.git
@@ -68,7 +67,6 @@ exclude = '''
   | \.tox
   | \.venv
   | _build
-  | buck-out
   | build
   | dist
 )/
