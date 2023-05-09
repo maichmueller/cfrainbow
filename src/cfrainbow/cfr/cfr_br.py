@@ -4,10 +4,10 @@ import pyspiel
 
 from cfrainbow.spiel_types import Action, Probability, Player, Infostate
 from cfrainbow.utils import counterfactual_reach_prob, infostates_gen
-from .cfr_vanilla import CFRVanilla, iterate_logging
+from .cfr_vanilla import VanillaCFR, iterate_logging
 
 
-class CFRBestResponse(CFRVanilla):
+class BestResponseCFR(VanillaCFR):
     def __init__(
         self,
         *args,

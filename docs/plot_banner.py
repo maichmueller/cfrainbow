@@ -274,7 +274,7 @@ if __name__ == "__main__":
                 jobs = list(
                     {
                         "Vanilla CFR": (
-                            CFRVanilla,
+                            VanillaCFR,
                             n_iters,
                             {
                                 "game_name": game,
@@ -329,7 +329,7 @@ if __name__ == "__main__":
                             },
                         ),
                         "CFR+": (
-                            CFRPlus,
+                            PlusCFR,
                             n_iters,
                             {
                                 "game_name": game,
@@ -368,7 +368,7 @@ if __name__ == "__main__":
                             },
                         ),
                         "PCFR+": (
-                            PredictiveCFRPlus,
+                            PredictivePlusCFR,
                             n_iters,
                             {
                                 "game_name": game,

@@ -266,7 +266,7 @@ if __name__ == "__main__":
                 list(
                     {
                         "CFR": (
-                            CFRVanilla,
+                            VanillaCFR,
                             n_iters,
                             {
                                 "game_name": game,
@@ -276,7 +276,7 @@ if __name__ == "__main__":
                             },
                         ),
                         "CFR (S)": (
-                            CFRVanilla,
+                            VanillaCFR,
                             n_iters,
                             {
                                 "game_name": game,
@@ -385,7 +385,7 @@ if __name__ == "__main__":
                             },
                         ),
                         "CFR+": (
-                            CFRPlus,
+                            PlusCFR,
                             n_iters,
                             {
                                 "game_name": game,
@@ -474,7 +474,7 @@ if __name__ == "__main__":
                             },
                         ),
                         "PCFR+": (
-                            PredictiveCFRPlus,
+                            PredictivePlusCFR,
                             n_iters,
                             {
                                 "game_name": game,

@@ -55,9 +55,9 @@ def case_name(val):
 @pytest.mark.parametrize(
     "cfr_class, cfr_class_args, cfr_class_kwargs",
     [
-        (CFRVanilla, (rm.RegretMatcher,), dict(alternating=True)),
-        (CFRVanilla, (rm.RegretMatcher,), dict(alternating=False)),
-        (CFRPlus, (rm.RegretMatcherPlus,), dict()),
+        (VanillaCFR, (rm.RegretMatcher,), dict(alternating=True)),
+        (VanillaCFR, (rm.RegretMatcher,), dict(alternating=False)),
+        (PlusCFR, (rm.RegretMatcherPlus,), dict()),
         (DiscountedCFR, (rm.RegretMatcherDiscounted,), dict(alternating=True)),
         (DiscountedCFR, (rm.RegretMatcherDiscounted,), dict(alternating=False)),
         (DiscountedCFR, (rm.RegretMatcherDiscountedPlus,), dict(alternating=True)),
@@ -70,7 +70,7 @@ def case_name(val):
         (ExponentialCFR, (rm.RegretMatcher,), dict(alternating=False)),
         (ExponentialCFR, (rm.RegretMatcherPlus,), dict(alternating=True)),
         (ExponentialCFR, (rm.RegretMatcherPlus,), dict(alternating=False)),
-        (PredictiveCFRPlus, (rm.AutoPredictiveRegretMatcherPlus,), dict()),
+        (PredictivePlusCFR, (rm.AutoPredictiveRegretMatcherPlus,), dict()),
     ]
     + [
         (

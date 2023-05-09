@@ -7,7 +7,7 @@ from cfrainbow.utils import counterfactual_reach_prob
 from .cfr_base import CFRBase, iterate_logging
 
 
-class CFRVanilla(CFRBase):
+class VanillaCFR(CFRBase):
     @iterate_logging
     def iterate(
         self,

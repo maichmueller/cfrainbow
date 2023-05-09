@@ -26,7 +26,7 @@ class GetitemZero:
         return 0.0
 
 
-class PredictiveCFRPlus(DiscountedCFR):
+class PredictivePlusCFR(DiscountedCFR):
     def __init__(
         self,
         *args,

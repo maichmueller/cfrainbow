@@ -9,10 +9,10 @@ from cfrainbow.strategy import (
     behaviour_to_nf_strategy,
 )
 from cfrainbow.utils import infostates_gen
-from .cfr_vanilla import CFRVanilla
+from .cfr_vanilla import VanillaCFR
 
 
-class CFRJointReconstruction(CFRVanilla):
+class JointReconstructionCFR(VanillaCFR):
     def __init__(
         self,
         *args,

@@ -119,7 +119,7 @@ if __name__ == "__main__":
     n_iters = 10000
     for minimizer in (rm.RegretMatcher,):
         run(
-            cfr.CFRVanilla,
+            cfr.VanillaCFR,
             n_iters,
             game="kuhn_poker",
             regret_minimizer=minimizer,

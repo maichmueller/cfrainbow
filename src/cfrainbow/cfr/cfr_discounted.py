@@ -3,10 +3,10 @@ from typing import Type
 import pyspiel
 
 from .. import rm
-from .cfr_vanilla import CFRVanilla
+from .cfr_vanilla import VanillaCFR
 
 
-class DiscountedCFR(CFRVanilla):
+class DiscountedCFR(VanillaCFR):
     def __init__(
         self,
         root_state: pyspiel.State,
@@ -48,7 +48,7 @@ class LinearCFR(DiscountedCFR):
         super().__init__(*args, **kwargs)
 
 
-class CFRPlus(DiscountedCFR):
+class PlusCFR(DiscountedCFR):
     def __init__(
         self,
         root_state: pyspiel.State,

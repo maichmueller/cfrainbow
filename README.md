@@ -94,7 +94,6 @@ For example, to use the Vanilla CFR algorithm:
 
 import cfrainbow
 from cfrainbow import cfr, rm
-import pyspiel
 
 cfrainbow.run(
   cfr.VanillaCFR, 
