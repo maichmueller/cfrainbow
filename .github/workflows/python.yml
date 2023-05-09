@@ -9,6 +9,7 @@ on:
 jobs:
   lint:
     runs-on: 'ubuntu-latest'
+    name: Pre-Commit Checks
     steps:
       - name: checkout
         uses: actions/checkout@v2
@@ -75,7 +76,7 @@ jobs:
           key: tox-${{ matrix.os }}-python-${{ matrix.config.python-version }}-${{ hashFiles('**/poetry.lock') }}
 
       - name: Setup cmake
-        uses: jwlawson/actions-setup-cmake@v1.9
+        uses: jwlawson/actions-setup-cmake@v1.14
         if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
         with:
           cmake-version: '3.25'
