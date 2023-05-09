@@ -67,6 +67,11 @@ jobs:
         with:
           path: .tox
           key: tox-${{ matrix.os }}-python-${{ matrix.config.python-version }}-${{ hashFiles('**/poetry.lock') }}
+      - name: Setup cmake
+        uses: jwlawson/actions-setup-cmake@v1.9
+        if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
+        with:
+          cmake-version: '3.25'
       - name: Install dependencies
         run: poetry install
         if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
