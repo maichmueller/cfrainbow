@@ -23,7 +23,7 @@ def plot_rainbow(
     map_of_algorithm_to_expl_lists: Dict[str, List[List[float]]],
     save: bool = False,
     save_name: Optional[str] = None,
-    light: bool = False
+    light: bool = False,
 ):
     dir_path = os.path.split(os.path.abspath(__file__))[0]
     font_files = matplotlib.font_manager.findSystemFonts(
@@ -53,7 +53,8 @@ def plot_rainbow(
                     )
 
                 list_of_algorithm_and_expl_lists = sorted(
-                    list(map_of_algorithm_to_expl_lists.items()), key=operator.itemgetter(0)
+                    list(map_of_algorithm_to_expl_lists.items()),
+                    key=operator.itemgetter(0),
                 )
                 linewidth = 0.5
                 x = np.arange(1, iters_run + 1)
@@ -61,7 +62,9 @@ def plot_rainbow(
 
                 sorting = [
                     (i, expl_list[0][-1])
-                    for i, (algo, expl_list) in enumerate(list_of_algorithm_and_expl_lists)
+                    for i, (algo, expl_list) in enumerate(
+                        list_of_algorithm_and_expl_lists
+                    )
                 ]
                 sorting = sorted(sorting, key=operator.itemgetter(1), reverse=True)
                 sorted_algorithm_to_expl_list = [
@@ -154,7 +157,7 @@ def plot_rainbow(
                         transform=ax.transAxes,
                         color=get_color(letter),
                         weight="bold",
-                        path_effects=[pe.withStroke(linewidth=.3, foreground="black")]
+                        path_effects=[pe.withStroke(linewidth=0.3, foreground="black")],
                     )
 
                 label_fontsize = 25
@@ -226,9 +229,7 @@ def plot_rainbow(
                     bbox_to_anchor=(0.5, 0.02),
                     fancybox=True,
                     ncol=5,
-                    prop=dict(
-                        family=font,
-                        size=14),
+                    prop=dict(family=font, size=14),
                 )
                 legend.get_frame().set_facecolor(bg_color)
                 for text in legend.get_texts():
@@ -385,7 +386,9 @@ if __name__ == "__main__":
                         augmented_jobs.extend(
                             [
                                 (alg, args[:-1] + (kwargs | {"seed": seed},))
-                                for seed in rng.integers(0, int(1e6), size=stochastic_seeds)
+                                for seed in rng.integers(
+                                    0, int(1e6), size=stochastic_seeds
+                                )
                             ]
                         )
                     else:
@@ -419,9 +422,5 @@ if __name__ == "__main__":
         }
         for light in [True, False]:
             plot_rainbow(
-                n_iters,
-                averaged_values,
-                save=True,
-                save_name=f"{seed}",
-                light=light
+                n_iters, averaged_values, save=True, save_name=f"{seed}", light=light
             )

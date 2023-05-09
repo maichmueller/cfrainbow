@@ -117,9 +117,7 @@ class PredictiveCFRPlus(DiscountedCFR):
         #     .items()
         # ):
         for action, action_prob in (
-                self.regret_minimizer(infostate)
-                        .recommend(self.iteration)
-                        .items()
+            self.regret_minimizer(infostate).recommend(self.iteration).items()
         ):
             child_value = self._traverse(
                 state.child(action),

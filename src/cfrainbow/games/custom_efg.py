@@ -136,7 +136,6 @@ zero_sum_payoffs = {
 
 class GameZeroSum(pyspiel.Game):
     def __init__(self, params=None):
-
         super().__init__(
             _GAME_TYPE,
             _GAME_INFO,
@@ -145,15 +144,16 @@ class GameZeroSum(pyspiel.Game):
 
     def new_initial_state(self):
         return State(self, payoffs=zero_sum_payoffs)
+
     def make_py_observer(self, iig_obs_type=None, params=None):
         """Returns an object used for observing game state."""
         return CustomEFGObserver(
             iig_obs_type or pyspiel.IIGObservationType(perfect_recall=True), params
         )
 
+
 class GameGeneralSum(pyspiel.Game):
     def __init__(self, params=None):
-
         super().__init__(
             _GAME_TYPE_GENERAL_SUM, _GAME_INFO_GENERAL_SUM, params or dict()
         )

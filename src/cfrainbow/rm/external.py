@@ -5,7 +5,8 @@ from typing import (
     Dict,
     Callable,
     Optional,
-    Any, List,
+    Any,
+    List,
 )
 
 from numba import njit

@@ -86,12 +86,12 @@ class CFRVanilla(CFRBase):
         return state_value
 
     def _update_regret_and_policy(
-            self,
-            curr_player,
-            infostate,
-            action_values,
-            state_value,
-            reach_prob_map,
+        self,
+        curr_player,
+        infostate,
+        action_values,
+        state_value,
+        reach_prob_map,
     ):
         regret_minimizer = self.regret_minimizer(infostate)
         # update the cumulative regret
@@ -107,6 +107,6 @@ class CFRVanilla(CFRBase):
         player_reach_prob = reach_prob_map[curr_player]
         avg_policy = self._avg_policy_at(curr_player, infostate)
         for action, curr_policy_prob in regret_minimizer.recommend(
-                self.iteration
+            self.iteration
         ).items():
             avg_policy[action] += player_reach_prob * curr_policy_prob

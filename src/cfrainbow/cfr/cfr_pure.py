@@ -28,9 +28,7 @@ class PureCFR(CFRBase):
         self._traverse(
             self.root_state.clone(),
             reach_prob=(
-                {player: 1.0 for player in self.players}
-                if self.simultaneous
-                else None
+                {player: 1.0 for player in self.players} if self.simultaneous else None
             ),
             updating_player=self._cycle_updating_player(updating_player),
         )
@@ -60,7 +58,6 @@ class PureCFR(CFRBase):
         sampled_action = self._sample_action(infostate, player_policy)
 
         if self.simultaneous or curr_player == updating_player:
-
             if self.simultaneous:
                 # update the average policy for the player
                 self._avg_policy_at(curr_player, infostate)[sampled_action] += 1

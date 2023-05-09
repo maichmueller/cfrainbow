@@ -20,7 +20,9 @@ class InternalCFR(PureCFR):
         internal_rm_kwargs: Mapping,
         **kwargs,
     ):
-        super().__init__(root_state, external_regret_minimizer_type, **external_rm_kwargs, **kwargs)
+        super().__init__(
+            root_state, external_regret_minimizer_type, **external_rm_kwargs, **kwargs
+        )
         self._internal_regret_minimizer_type: Type[
             InternalRegretMinimizer
         ] = internal_regret_minimizer_type
@@ -68,7 +70,6 @@ class InternalCFR(PureCFR):
         sampled_action = self._sample_action(infostate, player_policy)
 
         if self.simultaneous or curr_player == updating_player:
-
             if self.simultaneous:
                 # increment the average policy for the player
                 self._avg_policy_at(curr_player, infostate)[sampled_action] += 1

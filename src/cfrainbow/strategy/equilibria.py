@@ -48,7 +48,6 @@ def cce_deviation_incentive(
     strategy_spaces = list(strategy_spaces)
     deviation_incentive = -cmath.inf
     for player, strategy_space in enumerate(strategy_spaces):
-
         strategy_space = list(strategy_space)
         opponent_strategy_space = strategy_spaces.copy()
         opponent_strategy_space.pop(player)
@@ -122,7 +121,6 @@ def ce_deviation_incentive(
     strategy_spaces = list(strategy_spaces)
     deviation_incentive = -cmath.inf
     for player, strategy_space in enumerate(strategy_spaces):
-
         strategy_space = list(strategy_space)
         opponent_strategy_space = strategy_spaces.copy()
         opponent_strategy_space.pop(player)

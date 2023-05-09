@@ -49,7 +49,9 @@ class JointNormalFormStrategy:
     def __init__(self, plans: Iterable[NormalFormStrategy]):
         self.strategies: tuple[NormalFormStrategy] = tuple(plans)
         # python float hashing distinguishes up to 1e-16 difference in the float
-        self.hash = hash(tuple(itertools.chain(map(lambda s: s.items(), self.strategies))))
+        self.hash = hash(
+            tuple(itertools.chain(map(lambda s: s.items(), self.strategies)))
+        )
 
     def __contains__(self, other_strategy):
         return any(other_strategy == strategy for strategy in self.strategies)
@@ -57,13 +59,15 @@ class JointNormalFormStrategy:
     def __hash__(self):
         return self.hash
 
-    def __eq__(self, other: Union[Sequence[NormalFormStrategy], JointNormalFormStrategy]):
+    def __eq__(
+        self, other: Union[Sequence[NormalFormStrategy], JointNormalFormStrategy]
+    ):
         if isinstance(other, JointNormalFormStrategy):
             return self.strategies == other.strategies
-        return all(other_strategy == strategy for other_strategy, strategy in zip(other, self.strategies))
+        return all(
+            other_strategy == strategy
+            for other_strategy, strategy in zip(other, self.strategies)
+        )
 
     def __repr__(self):
         return repr(self.strategies)
-
-
-
