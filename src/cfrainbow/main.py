@@ -23,7 +23,7 @@ from cfrainbow.utils import (
 def run(
     solver: Type[CFRBase],
     n_iter: int,
-    regret_minimizer: type[rm.ExternalRegretMinimizer] = rm.RegretMatcher,
+    regret_minimizer: Type[rm.ExternalRegretMinimizer] = rm.RegretMatcher,
     game: Union[pyspiel.Game, str] = "kuhn_poker",
     policy_printer: Optional[PolicyPrinter] = None,
     progressbar: bool = False,
