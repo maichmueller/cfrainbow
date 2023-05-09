@@ -9,6 +9,8 @@
 # <p align=center> CFRainbow
 <p align=center> Implementations Of <i>Counterfactual Regret Minimization</i> In Its Many Shapes & Colors
 
+[![Python CI](https://github.com/maichmueller/cfrainbow/actions/workflows/python.yml/badge.svg?branch=main)](https://github.com/maichmueller/cfrainbow/actions/workflows/python.yml)
+
 CFRainbow provides implementations of the basic CFR algorithm and some of the improved variants of CFR
 for computing <b>Nash Equilibria</b> in the 2-player 0-sum case as well as <b>Correlated Equilibria</b> in the general-sum case.
 
