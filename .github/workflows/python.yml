@@ -45,9 +45,11 @@ jobs:
         uses: actions/setup-python@v2
         with:
           architecture: x64
+
       - name: Update pip
         run: |
           python -m pip install --upgrade pip
+
       - name: Install poetry
         uses: snok/install-poetry@v1
         with:
@@ -55,6 +57,7 @@ jobs:
           virtualenvs-create: true
           virtualenvs-in-project: true
           installer-parallel: false
+
       - name: Load cached virtual env
         id: cached-poetry-dependencies
         uses: actions/cache@v3
@@ -67,21 +70,37 @@ jobs:
         with:
           path: .tox
           key: tox-${{ matrix.os }}-python-${{ matrix.config.python-version }}-${{ hashFiles('**/poetry.lock') }}
+
       - name: Setup cmake
         uses: jwlawson/actions-setup-cmake@v1.9
         if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
         with:
           cmake-version: '3.25'
+
+      - name: Install Clang
+        if: matrix.os == 'macos-latest' && steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
+        run: |
+          brew update
+          brew install llvm
+
+      - name: Setup Clang via Marketplace
+        if: matrix.os != 'macos-latest' && steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
+        uses: egor-tensin/setup-clang@v1
+        with:
+          llvm-version: '15.0.0'
+
       - name: Install dependencies
         run: poetry install
         if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
         env:
           PATH: "$HOME/.poetry/bin:$PATH"
+
       - name: Run tox with coverage
         run: |
           tox -e py${{ matrix.config.tox }} -- -n auto --cov=.
         env:
           PATH: "$HOME/.poetry/bin:$PATH"
+
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v3
         with:
