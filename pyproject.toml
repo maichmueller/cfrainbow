@@ -4,12 +4,13 @@ build-backend = "poetry.masonry.api"
 
 [tool.poetry]
 name = 'cfrainbow'
-version = '0.1.0'
+version = '0.1.1'
 authors = [
     'Michael Aichmueller <m.aichmueller@gmail.com>'
 ]
 license = 'MIT license'
 description = 'Counterfactual Regret Minimization Open-Source Implementations'
+readme = "README.md"
 keywords = [
     'counterfactual regret minimization',
     'regret minimization',
