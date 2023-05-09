@@ -42,25 +42,6 @@ and those that are planned to be implemented in the future (📅):
 
 # Installation
 
-### <b> Source Install </b>
-
-To install CFRainbow from master, please follow these steps:
-
-```bash
-git clone https://github.com/yourusername/cfrainbow.git
-cd cfrainbow
-```
-and install the package with pip
-```bash
-pip install .
-```
-or poetry
-```bash
-poetry install
-```
-use the option `--no-dev` to ensure a non-editable installation.
-
-
 ### <b> Web Install </b>
 
 <b> Pip </b>
@@ -84,6 +65,25 @@ Then run:
 ```bash
 poetry install
 ```
+
+to install your own package. Poetry will then install `cfrainbow` as dependency alongside your own package.
+### <b> Source Install </b>
+
+To install CFRainbow from master, please follow these steps:
+
+```bash
+git clone https://github.com/maichmueller/cfrainbow.git
+cd cfrainbow
+```
+and install the package with pip
+```bash
+pip install .
+```
+or poetry
+```bash
+poetry install
+```
+use the option `--no-dev` to ensure a non-editable installation.
 
 # Usage
 
