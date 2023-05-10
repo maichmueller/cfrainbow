@@ -51,6 +51,9 @@ open_spiel = { version = ">=1.0" }
 tqdm = "*"
 numba = { version = ">=0.5" }
 
+[tool.poetry.group.dev]
+optional = true
+
 [tool.poetry.group.dev.dependencies]
 pre-commit = "*"
 tox = "*"
