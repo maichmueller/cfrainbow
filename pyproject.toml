@@ -61,6 +61,12 @@ pytest = "*"
 pytest-xdist = "*"
 pytest-cov = "*"
 
+[tool.poetry.group.packaging]
+optional = true
+
+[tool.poetry.group.packaging.dependencies]
+beautifulsoup4 = "*"
+
 
 [tool.black]
 include = '\.pyi?$'
