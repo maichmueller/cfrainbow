@@ -103,7 +103,7 @@ jobs:
 
       - name: Run tox with coverage
         run: |
-          poetry run tox -e ${{ matrix.config.tox }} -- -- -n auto --cov=.
+          poetry run tox -e ${{ matrix.config.tox }} -- -- -n auto --cov=cfrainbow
         env:
           PATH: "$HOME/.poetry/bin:$PATH"
 
