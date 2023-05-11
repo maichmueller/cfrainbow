@@ -103,7 +103,7 @@ jobs:
 
       - name: Run tox with coverage
         run: |
-          poetry run tox -e ${{ matrix.config.tox }} -- -- -n auto --cov=cfrainbow
+          poetry run tox -e ${{ matrix.config.tox }} -- -- -n auto --cov=cfrainbow --cov-report xml:cov.xml
         env:
           PATH: "$HOME/.poetry/bin:$PATH"
 
@@ -113,3 +113,4 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           flags: unittests
           env_vars: OS,PY
+          files: cov.xml
