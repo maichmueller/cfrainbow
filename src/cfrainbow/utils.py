@@ -184,21 +184,30 @@ def normalize_policy_profile(
 
 
 class PolicyPrinter(ABC):
-    register: Dict[pyspiel.Game, Type[PolicyPrinter]]
-
     def print_profile(
         self,
         policy_profile: Union[
-            Dict[Player, Dict[Infostate, Dict[Action, Probability]]],
+            List[StatePolicyHint],
+            Dict[Player, StatePolicyHint],
             Dict[Player, pyspiel.TabularPolicy],
         ],
     ) -> str:
         prints = []
-        policy_profile = sorted(policy_profile.items(), key=operator.itemgetter(0))
-        for player, policy in policy_profile:
-            if isinstance(policy, pyspiel.TabularPolicy):
-                policy = policy.policy_table()
-            prints.append(f"PLAYER {player + 1}:\n{self.print_policy(player, policy)}")
+        if isinstance(policy_profile, list):
+            # we assume entry i is the policy of player i.
+            policy_profile = list(enumerate(policy_profile))
+        else:
+            policy_profile = sorted(policy_profile.items(), key=operator.itemgetter(0))
+
+        for player, state_policy in policy_profile:
+            # if pyspiel policy, convert to a dict
+            if isinstance(state_policy, pyspiel.TabularPolicy):
+                state_policy = state_policy.policy_table()
+
+            prints.append(
+                f"PLAYER {player}:\n{self.print_policy(player, state_policy)}"
+            )
+
         return "\n".join(prints)
 
     @abstractmethod
@@ -223,7 +232,7 @@ class EmptyPolicyPrinter(PolicyPrinter):
         return ""
 
 
-_fill_len = len(f"P1: {'?'.center(5, ' ')} | P2: {'?'.center(5, ' ')} | c b ")
+_fill_len = len(f"P0: {'?'.center(5, ' ')} | P1: {'?'.center(5, ' ')} | c b ")
 _kuhn_poker_infostate_translation = {
     k: v.ljust(_fill_len, " ")
     for k, v in {
