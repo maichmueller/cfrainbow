@@ -23,7 +23,7 @@ The package is in the early WIP phase.
 
 # Usage
 
-To use CFRainbow, import the desired algorithm from the package, a regret minimizer, and the `run` method with a game(-name) as input.
+The easiest way to use CFRainbow is to import the desired algorithm from the package, a regret minimizer, and the `run` method with a pyspiel game object or its OpenSpiel name as input.
 For example, to use the Vanilla CFR algorithm:
 
 ```python
@@ -38,7 +38,52 @@ cfrainbow.run(
   regret_minimizer=rm.RegretMatcher
 )
 ```
-For more detailed examples, please refer to the examples directory (wip).
+This will run the algorithm for the number of iterations given and compute the exploitability.
+
+You can also use the solver object directly and call `iterate` on it after instantiating it with the correct arguments. 
+For example:
+
+```python
+from cfrainbow import cfr, rm
+from cfrainbow.utils import load_game, KuhnPolicyPrinter, normalize_policy_profile
+
+root_state = load_game("kuhn_poker").new_initial_state()
+
+solver = cfr.VanillaCFR(
+    root_state,
+    regret_minimizer_type=rm.RegretMatcher,
+    alternating=True,  # whether to do alternating or simultaneous updates
+)
+# iterate for a given number of iterations. 
+for i in range(1000):
+    solver.iterate()
+
+avg_policy = normalize_policy_profile(solver.average_policy())
+
+print(
+    KuhnPolicyPrinter(digits=2).print_profile(avg_policy)
+)
+```
+Output (Infostate --> Action Policy):
+```
+PLAYER 0:
+P1: Jack  | P2:   ?   | cb   --> ['check:  1.00', 'bet:  0.00']
+P1: Jack  | P2:   ?          --> ['check:  0.81', 'bet:  0.19']
+P1: Queen | P2:   ?   | cb   --> ['check:  0.48', 'bet:  0.52']
+P1: Queen | P2:   ?          --> ['check:  0.99', 'bet:  0.01']
+P1: King  | P2:   ?   | cb   --> ['check:  0.00', 'bet:  1.00']
+P1: King  | P2:   ?          --> ['check:  0.42', 'bet:  0.58']
+PLAYER 1:
+P1:   ?   | P2: Queen | c    --> ['check:  0.99', 'bet:  0.01']
+P1:   ?   | P2: Queen | b    --> ['check:  0.66', 'bet:  0.34']
+P1:   ?   | P2: King  | c    --> ['check:  0.00', 'bet:  1.00']
+P1:   ?   | P2: King  | b    --> ['check:  0.00', 'bet:  1.00']
+P1:   ?   | P2: Jack  | c    --> ['check:  0.67', 'bet:  0.33']
+P1:   ?   | P2: Jack  | b    --> ['check:  1.00', 'bet:  0.00']
+```
+Note that in <i>alternating</i> updates each iteration is a single player's policy update. 
+In <i>simultaneous</i> updates both players' policy updates constitute one iteration.
+
 
 ## Available Algorithms
 
