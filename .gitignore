@@ -18,3 +18,4 @@ poetry.lock
 .tox/
 
 bench.py
+.coverage
