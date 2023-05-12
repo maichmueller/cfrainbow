@@ -59,6 +59,7 @@ def case_name(val):
     [
         (VanillaCFR, (rm.RegretMatcher,), dict(alternating=True)),
         (VanillaCFR, (rm.RegretMatcher,), dict(alternating=False)),
+        (BestResponseCFR, (rm.RegretMatcher,), dict()),
         (PlusCFR, (rm.RegretMatcherPlus,), dict()),
         (DiscountedCFR, (rm.RegretMatcherDiscounted,), dict(alternating=True)),
         (DiscountedCFR, (rm.RegretMatcherDiscounted,), dict(alternating=False)),
