@@ -1,24 +1,18 @@
 import cmath
 import math
 from abc import ABC, abstractmethod
-from typing import (
-    Dict,
-    Callable,
-    Optional,
-    Any,
-    List,
-)
+from typing import Any, Callable, Dict, List, Optional
 
 from numba import njit
 
+from ..spiel_types import *
 from .unbound import (
     hedge,
-    regret_matching,
-    regret_matching_plus,
     predictive_regret_matching,
     predictive_regret_matching_plus,
+    regret_matching,
+    regret_matching_plus,
 )
-from ..spiel_types import *
 
 
 class ExternalRegretMinimizer(ABC):

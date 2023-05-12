@@ -1,14 +1,15 @@
 from collections import defaultdict
 from collections.abc import MutableMapping
-from copy import deepcopy, copy
+from copy import copy, deepcopy
 from dataclasses import astuple, dataclass
-from typing import Dict, Sequence, Optional, Type, List, Set
+from typing import Dict, List, Optional, Sequence, Set, Type
 
 import pyspiel
 
 from cfrainbow.rm import ExternalRegretMinimizer
-from cfrainbow.spiel_types import Infostate, Value, Action, Probability, Regret, Player
+from cfrainbow.spiel_types import Action, Infostate, Player, Probability, Regret, Value
 from cfrainbow.utils import counterfactual_reach_prob, infostates_gen
+
 from .cfr_base import iterate_logging
 from .cfr_discounted import DiscountedCFR
 

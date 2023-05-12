@@ -2,13 +2,13 @@ import functools
 import inspect
 from collections import deque
 from copy import copy
-from typing import Dict, Optional, Type, Sequence, MutableMapping, Union
+from typing import Dict, MutableMapping, Optional, Sequence, Type, Union
 
 import numpy as np
 import pyspiel
 
 from cfrainbow.rm import ExternalRegretMinimizer
-from cfrainbow.spiel_types import Action, Infostate, Probability, Player
+from cfrainbow.spiel_types import Action, Infostate, Player, Probability
 from cfrainbow.utils import slice_kwargs
 
 

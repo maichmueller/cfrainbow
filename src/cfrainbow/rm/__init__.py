@@ -1,17 +1,17 @@
 from .external import (
+    AutoPredictiveRegretMatcher,
+    AutoPredictiveRegretMatcherPlus,
     ExternalRegretMinimizer,
     Hedge,
     RegretMatcher,
-    RegretMatcherPlus,
     RegretMatcherDiscounted,
     RegretMatcherDiscountedPlus,
-    AutoPredictiveRegretMatcher,
-    AutoPredictiveRegretMatcherPlus,
+    RegretMatcherPlus,
 )
-from .internal import InternalRegretMinimizer, InternalFromExternalRegretMinimizer
+from .internal import InternalFromExternalRegretMinimizer, InternalRegretMinimizer
 from .unbound import (
-    regret_matching,
-    regret_matching_plus,
     predictive_regret_matching,
     predictive_regret_matching_plus,
+    regret_matching,
+    regret_matching_plus,
 )

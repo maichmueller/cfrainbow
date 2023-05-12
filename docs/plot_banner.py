@@ -10,7 +10,8 @@ import matplotlib.font_manager
 import matplotlib.patheffects as pe
 import numpy as np
 import torch
-from matplotlib import pyplot as plt, ft2font
+from matplotlib import ft2font
+from matplotlib import pyplot as plt
 from tqdm import tqdm
 
 from cfrainbow import rm

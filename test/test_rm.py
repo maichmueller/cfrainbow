@@ -1,14 +1,14 @@
 import math
+import random
 
 import pytest
 
 from cfrainbow import rm
 from cfrainbow.utils import (
-    normalize_policy_profile,
     normalize_action_policy,
+    normalize_policy_profile,
     normalize_state_policy,
 )
-import random
 
 random.seed(0)
 

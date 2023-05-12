@@ -1,4 +1,5 @@
 import itertools
+
 import pyspiel
 import pytest
 from tqdm import tqdm
@@ -7,6 +8,7 @@ from cfrainbow import rm
 from cfrainbow.cfr import *
 from cfrainbow.cfr.cfr_base import CFRBase
 from cfrainbow.utils import all_states_gen, to_pyspiel_policy
+
 from .utils import CircularList
 
 MAX_ITER = int(1e6)

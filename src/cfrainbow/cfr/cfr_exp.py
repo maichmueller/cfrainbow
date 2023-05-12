@@ -3,12 +3,12 @@ from copy import deepcopy
 from typing import Dict, Optional, Sequence
 
 import numpy as np
-
-from .cfr_base import CFRBase, iterate_logging
 import pyspiel
 
+from cfrainbow.spiel_types import Action, Infostate, Player, Probability, Regret
 from cfrainbow.utils import counterfactual_reach_prob
-from cfrainbow.spiel_types import Action, Infostate, Probability, Regret, Player
+
+from .cfr_base import CFRBase, iterate_logging
 
 
 class ExponentialCFR(CFRBase):

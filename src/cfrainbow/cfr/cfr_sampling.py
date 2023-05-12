@@ -1,12 +1,13 @@
 import itertools
 from collections import defaultdict
 from copy import deepcopy
-from typing import Optional, Dict, Mapping
+from typing import Dict, Mapping, Optional
 
 import pyspiel
 
-from cfrainbow.spiel_types import Action, Infostate, Probability, JointNormalFormPlan
-from cfrainbow.utils import sample_on_policy, counterfactual_reach_prob
+from cfrainbow.spiel_types import Action, Infostate, JointNormalFormPlan, Probability
+from cfrainbow.utils import counterfactual_reach_prob, sample_on_policy
+
 from .cfr_base import iterate_logging
 from .cfr_pure import PureCFR
 

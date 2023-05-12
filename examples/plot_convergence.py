@@ -1,7 +1,10 @@
 import operator
 import os
-from typing import Dict, List, Optional
 import pickle
+from collections import Counter, defaultdict
+from multiprocessing import Pool, cpu_count
+from typing import Dict, List, Optional
+
 import matplotlib.cm
 import numpy as np
 import torch
@@ -10,12 +13,9 @@ from matplotlib.collections import LineCollection
 from matplotlib.lines import Line2D
 from tqdm import tqdm
 
-from collections import Counter, defaultdict
-from multiprocessing import Pool, cpu_count
-
 from cfrainbow import rm
-from cfrainbow.main import run
 from cfrainbow.cfr import *
+from cfrainbow.main import run
 
 
 def plot_cfr_convergence(

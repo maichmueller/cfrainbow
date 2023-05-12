@@ -4,37 +4,38 @@ from copy import deepcopy
 from dataclasses import dataclass
 from enum import Enum
 from typing import (
-    Sequence,
     Dict,
-    Tuple,
-    Set,
-    List,
-    NamedTuple,
-    Union,
-    Mapping,
-    Optional,
     Generator,
+    List,
+    Mapping,
+    NamedTuple,
+    Optional,
+    Sequence,
+    Set,
+    Tuple,
+    Union,
 )
+
 import numpy as np
 import pyspiel
 from tqdm import tqdm
 
 from cfrainbow.spiel_types import (
-    Infostate,
     Action,
-    NormalFormPlan,
-    NormalFormStrategySpace,
-    Probability,
-    Player,
+    Infostate,
     JointNormalFormPlan,
     JointNormalFormStrategy,
+    NormalFormPlan,
+    NormalFormStrategySpace,
+    Player,
+    Probability,
     SequenceFormStrategySpace,
 )
 from cfrainbow.utils import (
+    KeyDependantDefaultDict,
+    SingletonMeta,
     all_states_gen,
     normalize_state_policy,
-    SingletonMeta,
-    KeyDependantDefaultDict,
 )
 
 

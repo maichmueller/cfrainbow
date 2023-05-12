@@ -8,15 +8,14 @@ from tqdm import tqdm
 import cfrainbow.cfr as cfr
 import cfrainbow.rm as rm
 from cfrainbow.cfr.cfr_base import CFRBase
-
 from cfrainbow.utils import (
-    to_pyspiel_policy,
+    KuhnPolicyPrinter,
+    PolicyPrinter,
+    load_game,
+    make_uniform_policy,
     normalize_policy_profile,
     slice_kwargs,
-    load_game,
-    PolicyPrinter,
-    KuhnPolicyPrinter,
-    make_uniform_policy,
+    to_pyspiel_policy,
 )
 
 

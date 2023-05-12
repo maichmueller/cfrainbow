@@ -1,10 +1,11 @@
 from __future__ import annotations
+
 from copy import copy
-from typing import Sequence, Mapping, Tuple, Union, Dict
+from typing import Dict, Mapping, Sequence, Tuple, Union
 
 import pyspiel
 
-from cfrainbow.spiel_types import Player, Action
+from cfrainbow.spiel_types import Action, Player
 
 
 class Node:

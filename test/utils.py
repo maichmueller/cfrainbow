@@ -1,4 +1,4 @@
-from typing import Any, List, Optional, Iterable, Iterator
+from typing import Any, Iterable, Iterator, List, Optional
 
 
 class CircularList:

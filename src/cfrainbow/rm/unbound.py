@@ -1,11 +1,7 @@
 import math
-from typing import (
-    Optional,
-    MutableMapping,
-)
+from typing import MutableMapping, Optional
 
 from ..spiel_types import *
-
 
 _POS_THRESH = 1e-8
 

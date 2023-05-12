@@ -16,7 +16,7 @@ CFRainbow provides implementations of the basic CFR algorithm and some of the im
 for computing <b>Nash Equilibria</b> in the 2-player 0-sum case as well as <b>Correlated Equilibria</b> in the general-sum case.
 
 The pacakge is loosely built for modularity and general applicability by building on the Openspiel framework by Deepmind. CFRainbow is <b>not</b> built
-for performance and will not scale well to large game implementations. Most algorithms are implemented with basic python data structures. 
+for performance and will not scale well to large game implementations. Most algorithms are implemented with basic python data structures.
 
 The package is in the early WIP phase.
 
@@ -32,15 +32,15 @@ import cfrainbow
 from cfrainbow import cfr, rm
 
 cfrainbow.run(
-  cfr.VanillaCFR, 
+  cfr.VanillaCFR,
   n_iter=1000,
-  game="kuhn_poker", 
+  game="kuhn_poker",
   regret_minimizer=rm.RegretMatcher
 )
 ```
 This will run the algorithm for the number of iterations given and compute the exploitability.
 
-You can also use the solver object directly and call `iterate` on it after instantiating it with the correct arguments. 
+You can also use the solver object directly and call `iterate` on it after instantiating it with the correct arguments.
 For example:
 
 ```python
@@ -54,7 +54,7 @@ solver = cfr.VanillaCFR(
     regret_minimizer_type=rm.RegretMatcher,
     alternating=True,  # whether to do alternating or simultaneous updates
 )
-# iterate for a given number of iterations. 
+# iterate for a given number of iterations.
 for i in range(1000):
     solver.iterate()
 
@@ -81,9 +81,8 @@ P1:   ?   | P2: King  | b    --> ['check:  0.00', 'bet:  1.00']
 P1:   ?   | P2: Jack  | c    --> ['check:  0.67', 'bet:  0.33']
 P1:   ?   | P2: Jack  | b    --> ['check:  1.00', 'bet:  0.00']
 ```
-Note that in <i>alternating</i> updates each iteration is a single player's policy update. 
+Note that in <i>alternating</i> updates each iteration is a single player's policy update.
 In <i>simultaneous</i> updates both players' policy updates constitute one iteration.
-
 
 ## Available Algorithms
 
@@ -150,5 +149,3 @@ or poetry
 poetry install
 ```
 use the option `--no-dev` to ensure a non-editable installation.
-
-

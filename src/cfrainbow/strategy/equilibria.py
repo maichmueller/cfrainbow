@@ -1,7 +1,7 @@
 import cmath
 import itertools
 from collections import defaultdict
-from typing import Sequence, Dict, Mapping, Tuple
+from typing import Dict, Mapping, Sequence, Tuple
 
 from cfrainbow.spiel_types import (
     NormalFormPlan,

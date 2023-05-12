@@ -4,6 +4,7 @@ from typing import Optional
 import pyspiel
 
 from cfrainbow.utils import sample_on_policy
+
 from .cfr_base import CFRBase, iterate_logging
 
 

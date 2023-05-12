@@ -1,9 +1,10 @@
-from typing import Optional, Dict
+from typing import Dict, Optional
 
 import pyspiel
 
-from cfrainbow.spiel_types import Action, Probability, Player, Infostate
+from cfrainbow.spiel_types import Action, Infostate, Player, Probability
 from cfrainbow.utils import counterfactual_reach_prob, infostates_gen
+
 from .cfr_vanilla import VanillaCFR, iterate_logging
 
 

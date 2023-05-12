@@ -1,15 +1,11 @@
 from abc import ABC, abstractmethod
-from typing import (
-    Dict,
-    Callable,
-    Optional,
-    Type,
-)
+from typing import Callable, Dict, Optional, Type
 
 import numpy as np
 
 from cfrainbow.spiel_types import *
 from cfrainbow.utils import slice_kwargs
+
 from .external import ExternalRegretMinimizer
 
 

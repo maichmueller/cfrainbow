@@ -1,15 +1,13 @@
 from collections import defaultdict
-from copy import deepcopy, copy
+from copy import copy, deepcopy
 from enum import Enum
-from typing import Optional, Dict, Sequence
+from typing import Dict, Optional, Sequence
 
 import pyspiel
 
-from cfrainbow.spiel_types import Probability, Action, Player, Infostate
-from cfrainbow.utils import (
-    counterfactual_reach_prob,
-    sample_on_policy,
-)
+from cfrainbow.spiel_types import Action, Infostate, Player, Probability
+from cfrainbow.utils import counterfactual_reach_prob, sample_on_policy
+
 from .cfr_base import CFRBase, iterate_logging
 
 

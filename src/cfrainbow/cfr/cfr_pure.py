@@ -1,11 +1,12 @@
-from copy import deepcopy, copy
-from typing import Optional, Dict, Mapping
+from copy import copy, deepcopy
+from typing import Dict, Mapping, Optional
 
-from .cfr_base import CFRBase, iterate_logging
 import pyspiel
 
-from cfrainbow.utils import sample_on_policy, counterfactual_reach_prob
 from cfrainbow.spiel_types import Action, Infostate, Probability
+from cfrainbow.utils import counterfactual_reach_prob, sample_on_policy
+
+from .cfr_base import CFRBase, iterate_logging
 
 
 class PureCFR(CFRBase):

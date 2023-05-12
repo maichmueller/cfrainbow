@@ -1,21 +1,21 @@
 from __future__ import annotations
+
 import cmath
 import inspect
 import itertools
 import operator
+import threading
 import warnings
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from enum import Enum
 from functools import reduce, singledispatchmethod
-from typing import Dict, List, Union, Any, Sequence, Mapping, Optional, Tuple, Type
+from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple, Type, Union
 
 import numpy as np
 import pyspiel
 
-import threading
-
-from cfrainbow.spiel_types import Infostate, Action, Probability, Player
+from cfrainbow.spiel_types import Action, Infostate, Player, Probability
 
 
 def counterfactual_reach_prob(reach_prob_map: Mapping[int, float], player: int):

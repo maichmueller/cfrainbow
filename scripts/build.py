@@ -1,6 +1,7 @@
-import shutil
-import os
 import argparse
+import os
+import shutil
+
 from bs4 import BeautifulSoup
 
 parser = argparse.ArgumentParser()

@@ -1,14 +1,15 @@
 import itertools
 from collections import defaultdict
-from typing import Optional, Dict, Mapping, List
+from typing import Dict, List, Mapping, Optional
 
-from cfrainbow.spiel_types import NormalFormPlan, JointNormalFormPlan
+from cfrainbow.spiel_types import JointNormalFormPlan, NormalFormPlan
 from cfrainbow.strategy import (
+    behaviour_to_nf_strategy,
     reachable_terminal_states,
     reduced_nf_space,
-    behaviour_to_nf_strategy,
 )
 from cfrainbow.utils import infostates_gen
+
 from .cfr_vanilla import VanillaCFR
 
 

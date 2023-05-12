@@ -1,6 +1,8 @@
 from __future__ import annotations
+
 import itertools
-from typing import Tuple, Mapping, Set, Union, Sequence, Iterable
+from typing import Iterable, Mapping, Sequence, Set, Tuple, Union
+
 import numba as nb
 
 Player = int

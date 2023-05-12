@@ -22,7 +22,7 @@ Commercial use refers to usage in a business environment, including:
  - anything that will generate direct or indirect income
 
 3. Modification
-Honey Script may not be modified, altered, adapted or built upon without written permission by its respective author. This pertains all files within the downloadable font zip-file. 
+Honey Script may not be modified, altered, adapted or built upon without written permission by its respective author. This pertains all files within the downloadable font zip-file.
 
 4. Conversion
 Honey Script may be converted to other formats such as WOFF, SVG or EOT webfonts, as long as the font is not modified in any other way, such as changing names or altering individual glyphs.
