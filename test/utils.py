@@ -8,6 +8,11 @@ class CircularList:
         self._items: List[Any] = [default] * size
         self._cursor: int = 0
 
+    def push(self, *items: Any) -> None:
+        for item in items:
+            self._items[self._cursor] = item
+            self._cursor = (self._cursor + 1) % self._size
+
     def __len__(self) -> int:
         return len(self._items)
 
@@ -19,15 +24,6 @@ class CircularList:
             raise IndexError("list index out of range")
         actual_index = (self._cursor - 1 - index) % self._size
         return self._items[actual_index]
-
-    def push(self, *items: Any) -> None:
-        for item in items:
-            self._items[self._cursor] = item
-            self._cursor = (self._cursor + 1) % self._size
-
-    def push_all(self, iterable: Iterable) -> None:
-        for item in iterable:
-            self.push(item)
 
     def __repr__(self):
         return repr(self._items)

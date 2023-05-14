@@ -16,6 +16,42 @@ from .unbound import (
 
 
 class ExternalRegretMinimizer(ABC):
+    """
+    Abstract base class for external regret minimizers.
+
+    Parameters
+    ----------
+    actions : Iterable[Action]
+        Iterable of actions available to the minimizer.
+
+    Attributes
+    ----------
+    actions : list
+        List of actions available to the minimizer.
+    recommendation_computed : bool
+        Boolean indicating if recommendation has been computed.
+    last_update_time : int
+        Integer representing the last iteration in which the minimizer observed utilities (or regret).
+    observes_regret
+        Returns whether the regret minimizer expects to observe utilities or regrets.
+    recommendation : dict
+        Dictionary mapping each action to its recommendation probability.
+        This is the currently 'next strategy' as recommended by the minimizer's internal logic.
+    cumulative_quantity : dict
+        Dictionary storing the cumulative quantity used for recommendations (either utility or regret values).
+
+    Methods
+    -------
+    __len__()
+        Returns the number of actions available to the minimizer.
+
+    reset()
+        Resets the cumulative quantity, recommendation, and update status.
+    recommend(iteration, *args, force=False, **kwargs)
+        Returns the recommendation distribution for the given iteration.
+
+    """
+
     def __init__(self, actions: Iterable[Action], *args, **kwargs):
         self._actions = list(actions)
         self._recommendation_computed: bool = False
@@ -106,6 +142,10 @@ def _parent_func(cls: type, obj: Any, func_name: str):
 
 
 class UtilityToRegretMixin:
+    """
+    Mixin class for converting utilities --> regrets to enable regret-based minimizers to work with utilities.
+    """
+
     cumulative_quantity: Dict[Action, float]
     recommendation: Dict[Action, float]
     actions: List[Action]
@@ -148,6 +188,10 @@ class UtilityToRegretMixin:
 
 
 class RegretMatchingMixin:
+    """
+    Mixin class that interweaves a regret matching step in the recommendation process.
+    """
+
     cumulative_quantity: Dict[Action, float]
     recommendation: Dict[Action, float]
 
@@ -182,6 +226,10 @@ class RegretMatchingMixin:
 
 
 class RegretMatchingPlusMixin(RegretMatchingMixin):
+    """
+    Mixin class that interweaves a regret matching+ step in the recommendation process.
+    """
+
     def _regret_minimizer_impl(self, *args, **kwargs):
         return regret_matching_plus(*args, **kwargs)
 
@@ -205,6 +253,12 @@ def weights(t: int, alpha: float, beta: float):
 
 
 class RegretDiscounterMixin:
+    """
+    Mixin class that interweaves a discounted regret matching step in the recommendation process.
+
+    The discount pressure is governed by the alpha and beta parameters that this mixin will swallow upon instantiation.
+    """
+
     cumulative_quantity: Dict[Action, float]
     recommendation: Dict[Action, float]
     actions: List[Action]
@@ -234,7 +288,12 @@ class RegretDiscounterMixin:
 
 
 class AutoPredictiveMixin:
-    """ """
+    """
+    Mixin class that interweaves a predictive regret matching step in the recommendation process.
+
+    The prediction is made automatically from the last observed quantities.
+    If the minimizer is queried every iteration t, then the predictions are the observed quantities from t-1.
+    """
 
     cumulative_quantity: Dict[Action, float]
     recommendation: Dict[Action, float]
@@ -357,6 +416,31 @@ def anytime_hedge_rate(iteration: int, nr_actions: int, *args, **kwargs) -> floa
 
 
 class Hedge(ExternalRegretMinimizer):
+    """
+    Hedge regret minimizer.
+
+    This class implements the Hedge algorithm for regret minimization. This algorithm is often also referred to as
+    `multiplicative weights` or `softmax`.
+
+    Parameters
+    ----------
+    actions : Iterable[Action]
+        The available actions for the Hedge algorithm.
+    learning_rate : Callable[[int, int, Sequence, Mapping], float], optional
+        The learning rate function that determines how much weight to assign to each action,
+        by default anytime_hedge_rate.
+
+    Attributes
+    ----------
+    observes_regret : bool
+        Whether the Hedge algorithm observes regret or not.
+
+    Methods
+    -------
+    _recommend(iteration: Optional[int] = None, *args, **kwargs)
+        Generates a recommendation based on the Hedge algorithm.
+    """
+
     def __init__(
         self,
         actions: Iterable[Action],

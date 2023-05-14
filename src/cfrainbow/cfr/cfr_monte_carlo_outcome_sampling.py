@@ -6,7 +6,11 @@ from typing import Dict, Optional, Sequence
 import pyspiel
 
 from cfrainbow.spiel_types import Action, Infostate, Player, Probability
-from cfrainbow.utils import counterfactual_reach_prob, sample_on_policy
+from cfrainbow.utils import (
+    child_reach_prob_map,
+    counterfactual_reach_prob,
+    sample_on_policy,
+)
 
 from .cfr_base import CFRBase, iterate_logging
 
@@ -100,7 +104,7 @@ class OutcomeSamplingMCCFR(CFRBase):
                 sampled_action_sample_prob,
             ) = self._sample_action(curr_player, updating_player, player_policy)
 
-            child_reach_prob = self.child_reach_prob_map(
+            child_reach_prob = child_reach_prob_map(
                 reach_prob, curr_player, sampled_action_policy_prob
             )
 

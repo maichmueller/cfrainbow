@@ -27,6 +27,53 @@ def iterate_logging(f):
 
 
 class CFRBase:
+    """
+    Base class for the Counterfactual Regret Minimization (CFR) algorithm.
+
+    Parameters
+    ----------
+    root_state : pyspiel.State
+        The root state of the game.
+    regret_minimizer_type : Type[ExternalRegretMinimizer]
+        The type of external regret minimizer to use.
+    average_policy_list : Optional[Sequence[MutableMapping[Infostate, MutableMapping[Action, Probability]]]]
+        The list of average policies per player, by default None.
+    alternating : bool
+        Whether to use alternating updates or not, by default True.
+    verbose : bool
+        Whether to print verbose output during the iterations, by default False.
+    seed : Optional[Union[int, np.random.Generator]]
+        The seed for the random number generator, by default None.
+    **regret_minimizer_kwargs
+        Keyword arguments to be passed to the external regret minimizer constructor.
+
+    Attributes
+    ----------
+    iteration : int
+        The current iteration of the CFR algorithm.
+    alternating : bool
+        Whether alternating updates are used or not.
+    simultaneous : bool
+        Whether simultaneous updates are used or not.
+    nodes_touched : int
+        The number of nodes touched during the CFR iterations.
+
+    Methods
+    -------
+    iterate_for(n: int)
+        Convenience wrapper to run n iterations of the algorithm.
+    iterate(Optional[int] = None)
+        Runs a single iteration of the CFR algorithm.
+    average_policy(Optional[Player] = None)
+        Fetches the average policies of the given player or all players.
+    regret_minimizer(Infostate)
+        Fetches the local regret minimizer for the given infostate.
+    action_list(Infostate)
+        Fetches the list of legal actions for the given infostate.
+    force_update()
+        Forces all regret minimizers to compute the latest recommendation.
+    """
+
     def __init__(
         self,
         root_state: pyspiel.State,
@@ -205,13 +252,3 @@ class CFRBase:
         divisor, remainder = divmod(self.iteration, self.nr_players)
         # '[iteration] [player] / [nr_players]' to highlight which player of this update cycle is currently updated
         return f"{self.iteration} [{divisor} | {(remainder + 1)}/{self.nr_players}]"
-
-    @staticmethod
-    def child_reach_prob_map(
-        reach_probability_map: MutableMapping[Player, Probability],
-        player: Player,
-        probability: Probability,
-    ):
-        child_reach_prob = copy(reach_probability_map)
-        child_reach_prob[player] *= probability
-        return child_reach_prob

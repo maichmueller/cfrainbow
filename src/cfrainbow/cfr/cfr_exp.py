@@ -6,7 +6,7 @@ import numpy as np
 import pyspiel
 
 from cfrainbow.spiel_types import Action, Infostate, Player, Probability, Regret
-from cfrainbow.utils import counterfactual_reach_prob
+from cfrainbow.utils import child_reach_prob_map, counterfactual_reach_prob
 
 from .cfr_base import CFRBase, iterate_logging
 
@@ -123,9 +123,9 @@ class ExponentialCFR(CFRBase):
     ):
         player_policy = self.regret_minimizer(infostate).recommend(self.iteration)
         for action, action_prob in player_policy.items():
-            child_reach_prob = deepcopy(reach_prob)
-            child_reach_prob[curr_player] *= action_prob
-
+            child_reach_prob = child_reach_prob_map(
+                reach_prob, curr_player, action_prob
+            )
             child_value = self._traverse(
                 state.child(action), child_reach_prob, updating_player
             )
@@ -140,9 +140,9 @@ class ExponentialCFR(CFRBase):
         for outcome, outcome_prob in state.chance_outcomes():
             next_state = state.child(outcome)
 
-            child_reach_prob = deepcopy(reach_prob)
-            child_reach_prob[state.current_player()] *= outcome_prob
-
+            child_reach_prob = child_reach_prob_map(
+                reach_prob, state.current_player(), outcome_prob
+            )
             child_value = self._traverse(next_state, child_reach_prob, updating_player)
             action_values[outcome] = child_value
             for p in self.players:

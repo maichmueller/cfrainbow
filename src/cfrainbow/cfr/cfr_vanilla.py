@@ -3,7 +3,7 @@ from typing import Dict, Optional
 import pyspiel
 
 from cfrainbow.spiel_types import Action, Player, Probability
-from cfrainbow.utils import counterfactual_reach_prob
+from cfrainbow.utils import child_reach_prob_map, counterfactual_reach_prob
 
 from .cfr_base import CFRBase, iterate_logging
 
@@ -57,9 +57,7 @@ class VanillaCFR(CFRBase):
         for outcome, outcome_prob in state.chance_outcomes():
             action_value = self._traverse(
                 state.child(outcome),
-                self.child_reach_prob_map(
-                    reach_prob, state.current_player(), outcome_prob
-                ),
+                child_reach_prob_map(reach_prob, state.current_player(), outcome_prob),
                 updating_player,
             )
             for p in self.players:
@@ -77,7 +75,7 @@ class VanillaCFR(CFRBase):
         ):
             child_value = self._traverse(
                 state.child(action),
-                self.child_reach_prob_map(reach_prob, current_player, action_prob),
+                child_reach_prob_map(reach_prob, current_player, action_prob),
                 updating_player,
             )
             action_values[action] = child_value

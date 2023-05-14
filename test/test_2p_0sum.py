@@ -49,6 +49,8 @@ def case_name(val):
     if isinstance(val, CFRBase):
         return val.__name__
     elif isinstance(val, tuple):
+        if not val:
+            return ""
         return f"regret_minimizer={val[0].__name__}"
     elif isinstance(val, dict):
         return ", ".join([f"{key}={value}" for key, value in val.items()])
@@ -73,7 +75,7 @@ def case_name(val):
         (ExponentialCFR, (rm.RegretMatcher,), dict(alternating=False)),
         (ExponentialCFR, (rm.RegretMatcherPlus,), dict(alternating=True)),
         (ExponentialCFR, (rm.RegretMatcherPlus,), dict(alternating=False)),
-        (PredictivePlusCFR, (rm.AutoPredictiveRegretMatcherPlus,), dict()),
+        (PredictivePlusCFR, tuple(), dict()),
     ]
     + [
         (

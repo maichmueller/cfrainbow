@@ -5,12 +5,22 @@ import inspect
 import itertools
 import operator
 import threading
-import warnings
 from abc import ABC, abstractmethod
 from collections import defaultdict
+from copy import copy
 from enum import Enum
-from functools import reduce, singledispatchmethod
-from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple, Type, Union
+from functools import reduce
+from typing import (
+    Any,
+    Dict,
+    List,
+    Mapping,
+    MutableMapping,
+    Optional,
+    Sequence,
+    Tuple,
+    Union,
+)
 
 import numpy as np
 import pyspiel
@@ -19,11 +29,27 @@ from cfrainbow.spiel_types import Action, Infostate, Player, Probability
 
 
 def counterfactual_reach_prob(reach_prob_map: Mapping[int, float], player: int):
+    """
+    Computes the counterfactual reach probability for a player node given the reach probability map of all players.
+    """
     return reduce(
         lambda x, y: x * y,
         [rp for i, rp in reach_prob_map.items() if i != player],
         1.0,
     )
+
+
+def child_reach_prob_map(
+    reach_probability_map: MutableMapping[Player, Probability],
+    player: Player,
+    probability: Probability,
+):
+    """
+    Computes the reach probability map for a child node given the parent reach probability map.
+    """
+    child_reach_prob = copy(reach_probability_map)
+    child_reach_prob[player] *= probability
+    return child_reach_prob
 
 
 def kuhn_optimal_policy(alpha: float):

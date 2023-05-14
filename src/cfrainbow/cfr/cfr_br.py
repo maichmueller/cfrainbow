@@ -3,7 +3,7 @@ from typing import Dict, Optional
 import pyspiel
 
 from cfrainbow.spiel_types import Action, Infostate, Player, Probability
-from cfrainbow.utils import counterfactual_reach_prob, infostates_gen
+from cfrainbow.utils import child_reach_prob_map, infostates_gen
 
 from .cfr_vanilla import VanillaCFR, iterate_logging
 
@@ -91,9 +91,7 @@ class BestResponseCFR(VanillaCFR):
                 action_prob = 1.0 * (br_action == action)
                 child_value = self._traverse(
                     state.child(action),
-                    self.child_reach_prob_map(
-                        reach_prob_map, current_player, action_prob
-                    ),
+                    child_reach_prob_map(reach_prob_map, current_player, action_prob),
                     updating_player,
                 )
                 for p in self.players:
@@ -108,9 +106,7 @@ class BestResponseCFR(VanillaCFR):
             ).items():
                 child_value = self._traverse(
                     state.child(action),
-                    self.child_reach_prob_map(
-                        reach_prob_map, current_player, action_prob
-                    ),
+                    child_reach_prob_map(reach_prob_map, current_player, action_prob),
                     updating_player,
                 )
                 action_values[action] = child_value
