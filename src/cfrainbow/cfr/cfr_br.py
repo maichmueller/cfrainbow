@@ -26,10 +26,11 @@ class BestResponseCFR(VanillaCFR):
         )
         self.infostate_to_player: Dict[Infostate, Player] = dict()
 
-        for infostate, player, state, _ in infostates_gen(self.root_state.clone()):
-            self.infostate_to_player[infostate] = player
-            self._set_action_list(infostate, state)
-            self.regret_minimizer(infostate)
+        for root_state in self.root_states:
+            for infostate, player, state, _ in infostates_gen(root_state):
+                self.infostate_to_player[infostate] = player
+                self._set_action_list(infostate, state)
+                self.regret_minimizer(infostate)
 
         self._best_response: Dict[Infostate, Action] = dict()
 
@@ -50,16 +51,21 @@ class BestResponseCFR(VanillaCFR):
         # let openspiel provide us with a dict mapping infostates to actions.
         # These actions will be the opponent's best response.
         self._best_response = pyspiel.TabularBestResponse(
-            self.root_state.get_game(),
+            self.game,
             self._peek_at_next_updating_player(),
             player_current_policy,
         ).get_best_response_actions()
         # do a regular cfr iteration
-        self._traverse(
-            self.root_state.clone(),
-            reach_prob_map={player: 1.0 for player in [-1] + self.players},
-            updating_player=updating_player,
-        )
+        updating_player = self._cycle_updating_player(updating_player)
+        for root_state, root_reach_prob_map in zip(
+            self.root_states, self.root_reach_probabilities
+        ):
+            self._traverse(
+                root_state.clone(),
+                reach_prob_map=root_reach_prob_map,
+                updating_player=updating_player,
+            )
+
         # free the br dict memory, as it is no longer needed in this iteration
         self._best_response = None
 

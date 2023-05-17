@@ -2,7 +2,7 @@ import functools
 import inspect
 from collections import deque
 from copy import copy
-from typing import Dict, MutableMapping, Optional, Sequence, Type, Union
+from typing import Dict, Iterable, List, MutableMapping, Optional, Sequence, Type, Union
 
 import numpy as np
 import pyspiel
@@ -24,6 +24,22 @@ def iterate_logging(f):
         return f(self, *args, **kwargs)
 
     return wrapped
+
+
+def _assert_game_constraints(game: pyspiel.Game):
+    game_type = game.get_type()
+    assert (
+        game_type.dynamics == pyspiel.GameType.Dynamics.SEQUENTIAL,
+        "CFR operates only on turn-based games.",
+    )
+    assert (
+        game_type.chance_mode
+        in (
+            pyspiel.GameType.ChanceMode.EXPLICIT_STOCHASTIC,
+            pyspiel.GameType.ChanceMode.DETERMINISTIC,
+        ),
+        "CFR operates only on discretely stochastic or deterministic games.",
+    )
 
 
 class CFRBase:
@@ -76,9 +92,10 @@ class CFRBase:
 
     def __init__(
         self,
-        root_state: pyspiel.State,
+        root_states: Union[Iterable[pyspiel.State], pyspiel.State],
         regret_minimizer_type: Type[ExternalRegretMinimizer],
         *,
+        root_reach_probabilities: Optional[List[Dict[Player, Probability]]] = None,
         average_policy_list: Optional[
             Sequence[MutableMapping[Infostate, MutableMapping[Action, Probability]]]
         ] = None,
@@ -87,27 +104,32 @@ class CFRBase:
         seed: Optional[Union[int, np.random.Generator]] = None,
         **regret_minimizer_kwargs,
     ):
-        game_type = root_state.get_game().get_type()
-        assert (
-            game_type.dynamics == pyspiel.GameType.Dynamics.SEQUENTIAL,
-            "CFR operates only on turn-based games.",
-        )
-        assert (
-            game_type.chance_mode
-            in (
-                pyspiel.GameType.ChanceMode.EXPLICIT_STOCHASTIC,
-                pyspiel.GameType.ChanceMode.DETERMINISTIC,
-            ),
-            "CFR operates only on discretely stochastic or deterministic games.",
-        )
-        self.root_state = root_state
-        self.players = list(range(root_state.num_players()))
+        if not isinstance(root_states, list):
+            root_states = (root_states,)
+        game: pyspiel.Game = root_states[0].get_game()
+        _assert_game_constraints(game)
+        players = list(range(game.num_players()))
+        if root_reach_probabilities is not None:
+            assert len(root_reach_probabilities) == len(
+                root_states
+            ), "Number of root reach probability maps does not match the number of passed root states"
+        else:
+            # if no reach probabilities are given then we expect the states to be true roots of the game
+            root_reach_probabilities = [
+                {player: Probability(1.0) for player in [-1] + players}
+                for _ in root_states
+            ]
+        # the passed parameters meet the constraints, so we continue to fill the members
+        self.game = game
+        self.root_states = root_states
+        self.players = players
+        self.root_reach_probabilities = root_reach_probabilities
         self.nr_players = len(self.players)
         self.regret_minimizer_type: Type[
             ExternalRegretMinimizer
         ] = regret_minimizer_type
         self.verbose = verbose
-        self.seed = seed
+        self.seed: Optional[Union[int, np.random.Generator]] = seed
         self.rng = np.random.default_rng(seed)
         # the association of infostates to their local external regret minimizers.
         # This dict will be filled on demand once the infostates have been encountered.

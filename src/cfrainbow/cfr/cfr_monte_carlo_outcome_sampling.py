@@ -49,22 +49,29 @@ class OutcomeSamplingMCCFR(CFRBase):
         self,
         updating_player: Optional[Player] = None,
     ):
-        value, tail_prob = self._traverse(
-            self.root_state.clone(),
-            reach_prob={player: 1.0 for player in [-1] + self.players},
-            updating_player=self._cycle_updating_player(updating_player),
-            sample_probability=1.0,
-            weights=[0.0] * self.nr_players
+        updating_player = self._cycle_updating_player(updating_player)
+        weights = (
+            [0.0] * self.nr_players
             if self.weighting_mode == OutcomeSamplingWeightingMode.lazy
-            else None,
+            else None
         )
+        for root_state, root_reach_prob_map in zip(
+            self.root_states, self.root_reach_probabilities
+        ):
+            self._traverse(
+                root_state.clone(),
+                reach_prob_map=root_reach_prob_map,
+                updating_player=updating_player,
+                sample_probability=1.0,
+                weights=weights,
+            )
+
         self._iteration += 1
-        return value
 
     def _traverse(
         self,
         state: pyspiel.State,
-        reach_prob: Dict[Player, float],
+        reach_prob_map: Dict[Player, float],
         updating_player: Optional[Player] = None,
         sample_probability=1.0,
         weights: Optional[Dict[Player, float]] = None,
@@ -82,10 +89,10 @@ class OutcomeSamplingMCCFR(CFRBase):
             )
             state.apply_action(int(sampled_action))
             sample_prob = sample_policy[action_index]
-            reach_prob[curr_player] *= sample_prob
+            reach_prob_map[curr_player] *= sample_prob
             return self._traverse(
                 state,
-                reach_prob,
+                reach_prob_map,
                 updating_player,
                 sample_probability * sample_prob,
                 weights=weights,
@@ -105,7 +112,7 @@ class OutcomeSamplingMCCFR(CFRBase):
             ) = self._sample_action(curr_player, updating_player, player_policy)
 
             child_reach_prob = child_reach_prob_map(
-                reach_prob, curr_player, sampled_action_policy_prob
+                reach_prob_map, curr_player, sampled_action_policy_prob
             )
 
             next_weights = copy(weights)
@@ -127,7 +134,7 @@ class OutcomeSamplingMCCFR(CFRBase):
             )
 
             def avg_policy_update_call():
-                if player_reach_prob := reach_prob[curr_player] != 0.0:
+                if player_reach_prob := reach_prob_map[curr_player] != 0.0:
                     self._update_average_policy(
                         curr_player,
                         infostate,
@@ -140,7 +147,7 @@ class OutcomeSamplingMCCFR(CFRBase):
 
             def regret_update_call():
                 cf_value_weight = action_value[curr_player] * counterfactual_reach_prob(
-                    reach_prob, curr_player
+                    reach_prob_map, curr_player
                 )
                 unsampled_action_regret = (
                     -cf_value_weight * tail_prob * sampled_action_policy_prob

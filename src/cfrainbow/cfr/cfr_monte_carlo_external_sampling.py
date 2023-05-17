@@ -11,12 +11,13 @@ from .cfr_base import CFRBase, iterate_logging
 class ExternalSamplingMCCFR(CFRBase):
     @iterate_logging
     def iterate(self, updating_player: Optional[int] = None):
-        value = self._traverse(
-            deepcopy(self.root_state),
-            updating_player=self._cycle_updating_player(updating_player),
-        )
+        updating_player = self._cycle_updating_player(updating_player)
+        for root_state in self.root_states:
+            self._traverse(
+                root_state.clone(),
+                updating_player=updating_player,
+            )
         self._iteration += 1
-        return value
 
     def _traverse(self, state: pyspiel.State, updating_player: int = 0):
         self._nodes_touched += 1

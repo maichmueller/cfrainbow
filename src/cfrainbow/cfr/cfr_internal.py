@@ -40,7 +40,7 @@ class InternalCFR(PureCFR):
 
         self._traverse(
             self.root_state.clone(),
-            reach_prob=(
+            reach_prob_map=(
                 {player: 1.0 for player in [-1] + self.players}
                 if self.simultaneous
                 else None
@@ -52,14 +52,14 @@ class InternalCFR(PureCFR):
     def _traverse(
         self,
         state: pyspiel.State,
-        reach_prob: Optional[Dict[int, Probability]] = None,
+        reach_prob_map: Optional[Dict[int, Probability]] = None,
         updating_player: Optional[int] = None,
     ):
         if state.is_terminal():
             return state.returns()
 
         if state.is_chance_node():
-            return self._traverse_chance_node(state, reach_prob, updating_player)
+            return self._traverse_chance_node(state, reach_prob_map, updating_player)
 
         curr_player = state.current_player()
         infostate = state.information_state_string(curr_player)

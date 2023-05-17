@@ -49,18 +49,21 @@ class ExponentialCFR(CFRBase):
         updating_player: Optional[Player] = None,
     ):
         updating_player = self._cycle_updating_player(updating_player)
-        self._traverse(
-            self.root_state.clone(),
-            reach_prob={player: 1.0 for player in [-1] + self.players},
-            updating_player=updating_player,
-        )
+        for root_state, root_reach_prob_map in zip(
+            self.root_states, self.root_reach_probabilities
+        ):
+            self._traverse(
+                root_state.clone(),
+                reach_prob_map=root_reach_prob_map,
+                updating_player=updating_player,
+            )
         self._apply_exponential_weight(updating_player)
         self._iteration += 1
 
     def _traverse(
         self,
         state: pyspiel.State,
-        reach_prob: Dict[Action, Probability],
+        reach_prob_map: Dict[Action, Probability],
         updating_player: Optional[Player] = None,
     ):
         self._nodes_touched += 1
@@ -74,7 +77,7 @@ class ExponentialCFR(CFRBase):
 
         if state.is_chance_node():
             return self._traverse_chance_node(
-                state, reach_prob, updating_player, action_values, state_value
+                state, reach_prob_map, updating_player, action_values, state_value
             )
 
         else:
@@ -84,7 +87,7 @@ class ExponentialCFR(CFRBase):
 
             state_value = self._traverse_player_node(
                 state,
-                reach_prob,
+                reach_prob_map,
                 updating_player,
                 infostate,
                 curr_player,
@@ -93,7 +96,7 @@ class ExponentialCFR(CFRBase):
             )
 
             if self.simultaneous or updating_player == curr_player:
-                cf_reach_prob = counterfactual_reach_prob(reach_prob, curr_player)
+                cf_reach_prob = counterfactual_reach_prob(reach_prob_map, curr_player)
                 regrets = self._regret_increments_of(curr_player, infostate)
                 for action, action_value in action_values.items():
                     regrets[action] += cf_reach_prob * (
@@ -102,7 +105,7 @@ class ExponentialCFR(CFRBase):
 
                 # set the player reach prob for this infostate
                 # (the probability of only the owning player playing to this infostate)
-                self._reach_prob[infostate] = reach_prob[curr_player]
+                self._reach_prob[infostate] = reach_prob_map[curr_player]
 
             return state_value
 

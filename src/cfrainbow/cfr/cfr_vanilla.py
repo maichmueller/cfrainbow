@@ -14,11 +14,15 @@ class VanillaCFR(CFRBase):
         self,
         updating_player: Optional[Player] = None,
     ):
-        self._traverse(
-            self.root_state.clone(),
-            reach_prob_map={player: 1.0 for player in [-1] + self.players},
-            updating_player=self._cycle_updating_player(updating_player),
-        )
+        updating_player = self._cycle_updating_player(updating_player)
+        for root_state, root_reach_prob_map in zip(
+            self.root_states, self.root_reach_probabilities
+        ):
+            self._traverse(
+                root_state.clone(),
+                reach_prob_map=root_reach_prob_map,
+                updating_player=updating_player,
+            )
         self._iteration += 1
 
     def _traverse(

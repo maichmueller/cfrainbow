@@ -45,7 +45,7 @@ class SamplingCFR(PureCFR):
 
         self._traverse(
             self.root_state.clone(),
-            reach_prob={player: 1.0 for player in [-1] + self.players},
+            reach_prob_map={player: 1.0 for player in [-1] + self.players},
             updating_player=self._cycle_updating_player(updating_player),
         )
         self.empirical_sum_of_play[
@@ -58,7 +58,7 @@ class SamplingCFR(PureCFR):
     def _traverse(
         self,
         state: pyspiel.State,
-        reach_prob: Optional[Dict[int, Probability]] = None,
+        reach_prob_map: Optional[Dict[int, Probability]] = None,
         updating_player: Optional[int] = None,
     ):
         self._nodes_touched += 1
@@ -67,7 +67,7 @@ class SamplingCFR(PureCFR):
             return state.returns()
 
         if state.is_chance_node():
-            return self._traverse_chance_node(state, reach_prob, updating_player)
+            return self._traverse_chance_node(state, reach_prob_map, updating_player)
 
         curr_player = state.current_player()
         infostate = state.information_state_string(curr_player)
@@ -85,7 +85,7 @@ class SamplingCFR(PureCFR):
 
         action_values = dict()
         for action in actions:
-            child_reach_prob = deepcopy(reach_prob)
+            child_reach_prob = deepcopy(reach_prob_map)
             child_reach_prob[action] *= action == sampled_action
 
             action_values[action] = self._traverse(
@@ -96,7 +96,7 @@ class SamplingCFR(PureCFR):
         state_value = action_values[sampled_action]
         player_state_value = state_value[curr_player]
 
-        cf_reach_prob = counterfactual_reach_prob(reach_prob, curr_player)
+        cf_reach_prob = counterfactual_reach_prob(reach_prob_map, curr_player)
         regret_minimizer.observe(
             self.iteration,
             lambda a: (

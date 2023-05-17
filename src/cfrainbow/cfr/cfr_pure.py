@@ -26,19 +26,21 @@ class PureCFR(CFRBase):
         # empty the previously sampled strategy
         self.plan.clear()
 
-        self._traverse(
-            self.root_state.clone(),
-            reach_prob=(
-                {player: 1.0 for player in self.players} if self.simultaneous else None
-            ),
-            updating_player=self._cycle_updating_player(updating_player),
-        )
+        updating_player = self._cycle_updating_player(updating_player)
+        for root_state, root_reach_prob_map in zip(
+            self.root_states, self.root_reach_probabilities
+        ):
+            self._traverse(
+                root_state.clone(),
+                reach_prob_map=root_reach_prob_map if self.simultaneous else None,
+                updating_player=updating_player,
+            )
         self._iteration += 1
 
     def _traverse(
         self,
         state: pyspiel.State,
-        reach_prob: Optional[Dict[int, Probability]] = None,
+        reach_prob_map: Optional[Dict[int, Probability]] = None,
         updating_player: Optional[int] = None,
     ):
         self._nodes_touched += 1
@@ -47,7 +49,7 @@ class PureCFR(CFRBase):
             return state.returns()
 
         if state.is_chance_node():
-            return self._traverse_chance_node(state, reach_prob, updating_player)
+            return self._traverse_chance_node(state, reach_prob_map, updating_player)
 
         curr_player = state.current_player()
         infostate = state.information_state_string(curr_player)
@@ -69,17 +71,17 @@ class PureCFR(CFRBase):
                 #  the cf. reach probability as in chance-sampling. Why this ends up being a correct regret update
                 #  is unclear, even more so because the policy update is exactly according to pure cfr, and not
                 #  chance-sampling.
-                prob_weight = counterfactual_reach_prob(reach_prob, curr_player)
+                prob_weight = counterfactual_reach_prob(reach_prob_map, curr_player)
             else:
                 prob_weight = 1.0
 
             action_values = dict()
             for action in actions:
                 if self.simultaneous:
-                    child_reach_prob = copy(reach_prob)
+                    child_reach_prob = copy(reach_prob_map)
                     child_reach_prob[curr_player] *= player_policy[action]
                 else:
-                    child_reach_prob = reach_prob
+                    child_reach_prob = reach_prob_map
 
                 action_values[action] = self._traverse(
                     state.child(action),
@@ -99,7 +101,7 @@ class PureCFR(CFRBase):
             if curr_player == self._peek_at_next_updating_player():
                 self._avg_policy_at(curr_player, infostate)[sampled_action] += 1
             state.apply_action(sampled_action)
-            state_value = self._traverse(state, reach_prob, updating_player)
+            state_value = self._traverse(state, reach_prob_map, updating_player)
 
         return state_value
 
