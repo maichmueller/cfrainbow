@@ -89,7 +89,7 @@ class CFRBase:
     ):
         game_type = root_state.get_game().get_type()
         assert (
-            game_type == pyspiel.GameType.Dynamics.SEQUENTIAL,
+            game_type.dynamics == pyspiel.GameType.Dynamics.SEQUENTIAL,
             "CFR operates only on turn-based games.",
         )
         assert (
