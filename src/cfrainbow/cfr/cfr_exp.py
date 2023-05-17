@@ -54,7 +54,7 @@ class ExponentialCFR(CFRBase):
         ):
             self._traverse(
                 root_state.clone(),
-                reach_prob_map=root_reach_prob_map,
+                reach_prob_map=root_reach_prob_map.copy(),
                 updating_player=updating_player,
             )
         self._apply_exponential_weight(updating_player)

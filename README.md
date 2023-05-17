@@ -47,7 +47,7 @@ For example:
 from cfrainbow import cfr, rm
 from cfrainbow.utils import load_game, KuhnPolicyPrinter, normalize_policy_profile
 
-root_state = load_game("kuhn_poker").new_initial_state()
+root_state = load_game("kuhn_poker").new_initial_states()
 
 solver = cfr.VanillaCFR(
     root_state,

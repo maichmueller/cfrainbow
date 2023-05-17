@@ -22,6 +22,8 @@ class OutcomeSamplingWeightingMode(Enum):
 
 
 class OutcomeSamplingMCCFR(CFRBase):
+    _min_probability_cutoff = 1e-8
+
     def __init__(
         self,
         *args,
@@ -60,7 +62,7 @@ class OutcomeSamplingMCCFR(CFRBase):
         ):
             self._traverse(
                 root_state.clone(),
-                reach_prob_map=root_reach_prob_map,
+                reach_prob_map=root_reach_prob_map.copy(),
                 updating_player=updating_player,
                 sample_probability=1.0,
                 weights=weights,
@@ -133,8 +135,10 @@ class OutcomeSamplingMCCFR(CFRBase):
                 weights=next_weights,
             )
 
-            def avg_policy_update_call():
-                if player_reach_prob := reach_prob_map[curr_player] != 0.0:
+            def avg_policy_update():
+                if (
+                    player_reach_prob := reach_prob_map[curr_player]
+                ) > self._min_probability_cutoff:
                     self._update_average_policy(
                         curr_player,
                         infostate,
@@ -145,7 +149,7 @@ class OutcomeSamplingMCCFR(CFRBase):
                         weights,
                     )
 
-            def regret_update_call():
+            def regret_update():
                 cf_value_weight = action_value[curr_player] * counterfactual_reach_prob(
                     reach_prob_map, curr_player
                 )
@@ -166,13 +170,13 @@ class OutcomeSamplingMCCFR(CFRBase):
                 regret_minimizer.observe(self.iteration, regret)
 
             if self.simultaneous:
-                regret_update_call()
-                avg_policy_update_call()
+                regret_update()
+                avg_policy_update()
             else:
                 if curr_player == updating_player:
-                    regret_update_call()
+                    regret_update()
                 elif curr_player == self._peek_at_next_updating_player():
-                    avg_policy_update_call()
+                    avg_policy_update()
             return action_value, tail_prob * sampled_action_policy_prob
 
     def _update_average_policy(

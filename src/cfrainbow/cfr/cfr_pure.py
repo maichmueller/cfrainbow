@@ -32,7 +32,9 @@ class PureCFR(CFRBase):
         ):
             self._traverse(
                 root_state.clone(),
-                reach_prob_map=root_reach_prob_map if self.simultaneous else None,
+                reach_prob_map=root_reach_prob_map.copy()
+                if self.simultaneous
+                else None,
                 updating_player=updating_player,
             )
         self._iteration += 1

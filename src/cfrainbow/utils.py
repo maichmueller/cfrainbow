@@ -132,31 +132,6 @@ def infostates_gen(
         yield state.information_state_string(curr_player), curr_player, state, d
 
 
-def to_pyspiel_policy(
-    policy_list,
-    default_policy: Optional[
-        Dict[
-            Infostate,
-            List[Tuple[Action, Probability]],
-        ]
-    ] = None,
-) -> pyspiel.TabularPolicy:
-    joint_policy = {
-        istate: [
-            (action, prob / max(1e-8, sum(as_and_ps.values())))
-            for action, prob in as_and_ps.items()
-        ]
-        for istate, as_and_ps in itertools.chain(
-            policy_list[0].items(), policy_list[1].items()
-        )
-    }
-    if default_policy is not None:
-        default_policy.update(joint_policy)
-    else:
-        default_policy = joint_policy
-    return pyspiel.TabularPolicy(default_policy)
-
-
 def sample_on_policy(
     values: Sequence[Any],
     policy: Sequence[float],
@@ -175,6 +150,34 @@ def sample_on_policy(
 
 ActionPolicyHint = Union[Dict[Action, Probability], List[Tuple[Action, Probability]]]
 StatePolicyHint = Dict[Infostate, ActionPolicyHint]
+
+
+def to_pyspiel_policy(
+    policy_list: List[StatePolicyHint],
+    default_policy: Optional[
+        Dict[
+            Infostate,
+            List[Tuple[Action, Probability]],
+        ]
+    ] = None,
+) -> pyspiel.TabularPolicy:
+    joint_policy = {
+        istate: [
+            (action, prob / max(1e-8, sum(as_and_ps.values())))
+            for action, prob in as_and_ps.items()
+        ]
+        for istate, as_and_ps in itertools.chain(
+            *(
+                policy.items() if isinstance(policy, dict) else policy
+                for policy in policy_list
+            )
+        )
+    }
+    if default_policy is not None:
+        default_policy.update(joint_policy)
+    else:
+        default_policy = joint_policy
+    return pyspiel.TabularPolicy(default_policy)
 
 
 def normalize_action_policy(action_policy: ActionPolicyHint):

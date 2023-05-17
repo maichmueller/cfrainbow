@@ -46,12 +46,14 @@ def run(
 
     expl_values = []
     game = load_game(game)
-    root_state = game.new_initial_state()
-    uniform_joint_policy = make_uniform_policy(root_state)
+    root_states = game.new_initial_states()
+    uniform_joint_policy = dict()
+    for root_state in root_states:
+        uniform_joint_policy.update(make_uniform_policy(root_state))
     n_infostates = len(uniform_joint_policy)
 
     solver_obj = solver(
-        root_state,
+        root_states,
         regret_minimizer,
         verbose=do_print and not progressbar,
         **solver_kwargs,
@@ -111,20 +113,21 @@ def run(
     ) == n_infostates:
         print(policy_printer.print_profile(solver_obj.average_policy()))
 
-    return expl_values
+    return solver_obj, expl_values
 
 
 if __name__ == "__main__":
     n_iters = 10000
     for minimizer in (rm.RegretMatcher,):
         run(
-            cfr.VanillaCFR,
+            cfr.OutcomeSamplingMCCFR,
             n_iters,
             game="kuhn_poker",
             regret_minimizer=minimizer,
             alternating=True,
             policy_printer=KuhnPolicyPrinter(),
             # progressbar=True,
+            weighting_mode=cfr.OutcomeSamplingWeightingMode.optimistic,
             final_expl_print=False,
             expl_threshold=1e-8,
             seed=0,

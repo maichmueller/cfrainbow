@@ -62,7 +62,7 @@ class BestResponseCFR(VanillaCFR):
         ):
             self._traverse(
                 root_state.clone(),
-                reach_prob_map=root_reach_prob_map,
+                reach_prob_map=root_reach_prob_map.copy(),
                 updating_player=updating_player,
             )
 
