@@ -87,6 +87,19 @@ class CFRBase:
         seed: Optional[Union[int, np.random.Generator]] = None,
         **regret_minimizer_kwargs,
     ):
+        game_type = root_state.get_game().get_type()
+        assert (
+            game_type == pyspiel.GameType.Dynamics.SEQUENTIAL,
+            "CFR operates only on turn-based games.",
+        )
+        assert (
+            game_type.chance_mode
+            in (
+                pyspiel.GameType.ChanceMode.EXPLICIT_STOCHASTIC,
+                pyspiel.GameType.ChanceMode.DETERMINISTIC,
+            ),
+            "CFR operates only on discretely stochastic or deterministic games.",
+        )
         self.root_state = root_state
         self.players = list(range(root_state.num_players()))
         self.nr_players = len(self.players)
