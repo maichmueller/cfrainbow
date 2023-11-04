@@ -303,19 +303,19 @@ class PokerPolicyPrinter(PolicyPrinter):
         if isinstance(policy, pyspiel.TabularPolicy):
             policy = policy.policy_table()
 
-        out = []
-        for infostate, action_policy in policy.items():
-            action_policy = list(
-                action_policy.items()
-                if isinstance(action_policy, dict)
-                else action_policy
-            )
-            out.append(
-                f"{_kuhn_poker_infostate_translation[(infostate, player)]} "
-                f"--> "
-                f"{list(f'{self.action_name(action)}: {prob: .{self.digits}f}' for action, prob in action_policy)}"
-            )
-        return "\n".join(out)
+        def line_generator():
+            for infostate, action_policy in policy.items():
+                action_policy = list(
+                    action_policy.items()
+                    if isinstance(action_policy, dict)
+                    else action_policy
+                )
+                yield (
+                    f"{_kuhn_poker_infostate_translation[(infostate, player)]} "
+                    f"--> "
+                    f"{list(f'{self.action_name(action)}: {prob: .{self.digits}f}' for action, prob in action_policy)}"
+                )
+        return "\n".join(line_generator())
 
 
 class KuhnPolicyPrinter(PokerPolicyPrinter):
