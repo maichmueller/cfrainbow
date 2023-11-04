@@ -9,6 +9,7 @@ from cfrainbow.utils import counterfactual_reach_prob, sample_on_policy
 
 from . import PureCFR
 from .cfr_base import iterate_logging
+import logging
 
 
 class InternalCFR(PureCFR):
@@ -24,6 +25,7 @@ class InternalCFR(PureCFR):
         super().__init__(
             root_state, external_regret_minimizer_type, **external_rm_kwargs, **kwargs
         )
+        logging.warning("Internal CFR is not yet implemented.")
         self._internal_regret_minimizer_type: Type[
             InternalRegretMinimizer
         ] = internal_regret_minimizer_type

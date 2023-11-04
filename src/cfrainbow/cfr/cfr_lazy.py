@@ -17,4 +17,4 @@ class CFRLazy(CFRBase):
             *args,
             **kwargs,
         )
-        raise NotImplementedError("Lazy CFR is not yet implemented/")
+        raise NotImplementedError("Lazy CFR is not yet implemented.")

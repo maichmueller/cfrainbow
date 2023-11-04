@@ -1,4 +1,5 @@
 import itertools
+import logging
 from collections import defaultdict
 from typing import Dict, List, Mapping, Optional
 
@@ -24,6 +25,7 @@ class JointReconstructionCFR(VanillaCFR):
     ):
         kwargs["alternating"] = False
         super().__init__(*args, **kwargs)
+        logging.warning("Joint-Reconstruction CFR is not yet implemented.")
         # the storage of all played strategy profiles in the iterations.
         self.empirical_freq_of_play: Dict[JointNormalFormPlan, float] = defaultdict(
             float
