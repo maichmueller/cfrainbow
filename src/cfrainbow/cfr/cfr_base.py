@@ -9,7 +9,7 @@ import pyspiel
 
 from cfrainbow.rm import ExternalRegretMinimizer
 from cfrainbow.spiel_types import Action, Infostate, Player, Probability
-from cfrainbow.utils import slice_kwargs, ChancePlayer
+from cfrainbow.utils import ChancePlayer, slice_kwargs
 
 
 def iterate_logging(f):

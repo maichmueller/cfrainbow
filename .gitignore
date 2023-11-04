@@ -21,3 +21,5 @@ bench.py
 .coverage
 
 dist
+
+.DS_Store

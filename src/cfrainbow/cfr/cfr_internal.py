@@ -1,3 +1,4 @@
+import logging
 from copy import deepcopy
 from typing import Dict, Mapping, Optional, Type
 
@@ -5,11 +6,10 @@ import pyspiel
 
 from cfrainbow.rm import ExternalRegretMinimizer, InternalRegretMinimizer
 from cfrainbow.spiel_types import Action, Infostate, Probability
-from cfrainbow.utils import counterfactual_reach_prob, sample_on_policy, ChancePlayer
+from cfrainbow.utils import ChancePlayer, counterfactual_reach_prob, sample_on_policy
 
 from . import PureCFR
 from .cfr_base import iterate_logging
-import logging
 
 
 class InternalCFR(PureCFR):
