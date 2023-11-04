@@ -9,7 +9,7 @@ import pyspiel
 
 from cfrainbow.rm import ExternalRegretMinimizer
 from cfrainbow.spiel_types import Action, Infostate, Player, Probability
-from cfrainbow.utils import slice_kwargs
+from cfrainbow.utils import slice_kwargs, ChancePlayer
 
 
 def iterate_logging(f):
@@ -116,7 +116,7 @@ class CFRBase:
         else:
             # if no reach probabilities are given then we expect the states to be true roots of the game
             root_reach_probabilities = [
-                {player: Probability(1.0) for player in [-1] + players}
+                {player: Probability(1.0) for player in [ChancePlayer] + players}
                 for _ in root_states
             ]
         # the passed parameters meet the constraints, so we continue to fill the members

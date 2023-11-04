@@ -48,7 +48,7 @@ class BestResponseCFR(VanillaCFR):
                 player_current_policy[infostate] = list(
                     rm.recommend(self.iteration).items()
                 )
-        # let openspiel provide us with a dict mapping infostates to actions.
+        # let openspiel provide us with a dict that maps infostates to actions.
         # These actions will be the opponent's best response.
         self._best_response = pyspiel.TabularBestResponse(
             self.game,

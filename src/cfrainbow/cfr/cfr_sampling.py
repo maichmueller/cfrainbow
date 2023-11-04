@@ -6,7 +6,7 @@ from typing import Dict, Mapping, Optional
 import pyspiel
 
 from cfrainbow.spiel_types import Action, Infostate, JointNormalFormPlan, Probability
-from cfrainbow.utils import counterfactual_reach_prob, sample_on_policy
+from cfrainbow.utils import counterfactual_reach_prob, sample_on_policy, ChancePlayer
 
 from .cfr_base import iterate_logging
 from .cfr_pure import PureCFR
@@ -45,7 +45,7 @@ class SamplingCFR(PureCFR):
 
         self._traverse(
             self.root_state.clone(),
-            reach_prob_map={player: 1.0 for player in [-1] + self.players},
+            reach_prob_map={player: 1.0 for player in [ChancePlayer] + self.players},
             updating_player=self._cycle_updating_player(updating_player),
         )
         self.empirical_sum_of_play[

@@ -5,7 +5,7 @@ import pyspiel
 
 from cfrainbow.rm import ExternalRegretMinimizer, InternalRegretMinimizer
 from cfrainbow.spiel_types import Action, Infostate, Probability
-from cfrainbow.utils import counterfactual_reach_prob, sample_on_policy
+from cfrainbow.utils import counterfactual_reach_prob, sample_on_policy, ChancePlayer
 
 from . import PureCFR
 from .cfr_base import iterate_logging
@@ -43,7 +43,7 @@ class InternalCFR(PureCFR):
         self._traverse(
             self.root_state.clone(),
             reach_prob_map=(
-                {player: 1.0 for player in [-1] + self.players}
+                {player: 1.0 for player in [ChancePlayer] + self.players}
                 if self.simultaneous
                 else None
             ),

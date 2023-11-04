@@ -27,6 +27,8 @@ import pyspiel
 
 from cfrainbow.spiel_types import Action, Infostate, Player, Probability
 
+ChancePlayer = -1
+
 
 def counterfactual_reach_prob(reach_prob_map: Mapping[int, float], player: int):
     """
@@ -315,6 +317,7 @@ class PokerPolicyPrinter(PolicyPrinter):
                     f"--> "
                     f"{list(f'{self.action_name(action)}: {prob: .{self.digits}f}' for action, prob in action_policy)}"
                 )
+
         return "\n".join(line_generator())
 
 
