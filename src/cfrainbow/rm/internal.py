@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Callable, Dict, Optional, Type
+from typing import Callable, Dict, List, Optional, Type
 
 import numpy as np
 
@@ -10,9 +10,11 @@ from .external import ExternalRegretMinimizer
 
 
 class InternalRegretMinimizer(ABC):
-    def __init__(self, actions: Iterable[Action], *args, **kwargs):
+    def __init__(self, actions: Union[int, Iterable[Action]], *args, **kwargs):
         self.recommendation: Dict[Action, Probability] = {}
-        self._actions = list(actions)
+        self._actions = (
+            list(actions) if isinstance(actions, Iterable) else list(range(actions))
+        )
         self._n_actions = len(self.actions)
         self._recommendation_computed: bool = False
         self._last_update_time: int = -1
@@ -59,7 +61,7 @@ class InternalRegretMinimizer(ABC):
     def observe(
         self,
         iteration: int,
-        utility: Callable[[Action, Action], float],
+        utility: Callable[[Action], float],
         *args,
         **kwargs,
     ):
@@ -71,23 +73,18 @@ class InternalRegretMinimizer(ABC):
 class InternalFromExternalRegretMinimizer(InternalRegretMinimizer):
     def __init__(
         self,
-        actions: Iterable[Action],
-        external_regret_minimizer_type: Type[ExternalRegretMinimizer],
+        actions: Union[int, Iterable[Action]],
+        external_regret_minimizer_factory: Callable[
+            [List[Action]], ExternalRegretMinimizer
+        ],
         *args,
         **kwargs,
     ):
         super().__init__(actions, *args, **kwargs)
-        self._regret_minimizer_kwargs = slice_kwargs(
-            kwargs, external_regret_minimizer_type.__init__
-        )
-
         self.external_minimizer = {
-            a: external_regret_minimizer_type(
-                self.actions, **self._regret_minimizer_kwargs
-            )
-            for a in self.actions
+            action: external_regret_minimizer_factory(self.actions)
+            for action in self.actions
         }
-
         self._last_update_time = -1
 
     def __len__(self):
@@ -109,40 +106,37 @@ class InternalFromExternalRegretMinimizer(InternalRegretMinimizer):
     def regret_mode(self):
         return self.external_minimizer[self.actions[0]].regret_mode
 
-    def reset(self):
-        for minimizer in self.external_minimizer.values():
-            minimizer.reset()
-        self.recommendation.clear()
-        self._recommendation_computed = False
-        self._last_update_time: int = -1
-
     def observe(
         self, iteration: int, utility: Callable[[Action], float], *args, **kwargs
     ):
+        utility = {action: utility(action) for action in self.actions}
         for assigned_action, erm in self.external_minimizer.items():
-            erm.observe_utility(
+            erm.observe(
                 iteration,
-                lambda a: utility(a) * self.recommendation[a],
+                lambda action: utility[action] * self.recommendation[assigned_action],
             )
         self._last_update_time = iteration
         self._recommendation_computed = False
 
     def _recommend(self, iteration: int = None, force: bool = False, *args, **kwargs):
+        """
+        This method builds the recommendation matrix Q first and then proceeds to generate a (left) fix-point p = pQ.
+        This fix-point is equivalently found as the eigenvector to the eigenvalue 1 when interpreting the
+        recommendation matrix Q^T as a Markov Process and considering Q^T p^T = p^T (^T means transpose)
+        """
         n_actions = len(self)
         # build the recommendations matrix
         recommendations = np.empty(shape=(n_actions, n_actions), dtype=float)
-        for i, action_from in enumerate(self.actions):
-            external_recommendation = self.external_minimizer[
-                action_from
-            ].recommendation(iteration, force)
-            recommendations[i, :] = [
-                external_recommendation[action_to]
-                for j, action_to in enumerate(self.actions)
-            ]
+        for i, external_minimizer in enumerate(self.external_minimizer.values()):
+            external_rec = external_minimizer.recommend(iteration, force)
+            # external-regret minimizer returns a dictionary indexed by the actions
+            recommendations[i, :] = [external_rec[action] for action in self.actions]
         # compute the stationary distribution of the markov chain transition matrix
         # determined by the recommendation matrix.
         # This will be the eigenvector to the eigenvalue 1.
         eigenvalues, eigenvectors = np.linalg.eig(recommendations.transpose())
-        rec = eigenvectors[np.where(np.isclose(eigenvalues, 1.0))[0]]
+        eigenvalue_1_index = np.where(np.isclose(eigenvalues, 1.0))[0]
+        # eigenvectors[:, k] is the k-th eigenvector, not eigenvectors[k, :] !
+        rec = np.real(eigenvectors[:, eigenvalue_1_index]).flatten()
         self.recommendation = rec / rec.sum()
         self._recommendation_computed = True
