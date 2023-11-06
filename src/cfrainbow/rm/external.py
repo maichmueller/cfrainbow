@@ -26,8 +26,8 @@ class ExternalRegretMinimizer(ABC):
 
     Attributes
     ----------
-    actions : list
-        List of actions available to the minimizer.
+    actions : list or int
+        List of actions available to the minimizer or number of actions available.
     recommendation_computed : bool
         Boolean indicating if recommendation has been computed.
     last_update_time : int
@@ -52,8 +52,10 @@ class ExternalRegretMinimizer(ABC):
 
     """
 
-    def __init__(self, actions: Iterable[Action], *args, **kwargs):
-        self._actions = list(actions)
+    def __init__(self, actions: Union[int, Iterable[Action]], *args, **kwargs):
+        self._actions = (
+            list(actions) if isinstance(actions, Iterable) else list(range(actions))
+        )
         self._recommendation_computed: bool = False
         self._n_actions = len(self._actions)
         self._last_update_time: int = -1
@@ -61,7 +63,7 @@ class ExternalRegretMinimizer(ABC):
         # the initial recommendation always suggests a uniform play over all actions
         uniform_prob = 1.0 / len(self.actions)
         self.recommendation: Dict[Action, Probability] = {
-            a: uniform_prob for a in actions
+            a: uniform_prob for a in self.actions
         }
         # the cumulative quantity is either...
         # 1. the cumulative regret (if regret based)
