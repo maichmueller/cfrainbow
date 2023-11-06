@@ -1,6 +1,8 @@
 import math
 from typing import MutableMapping, Optional
 
+import numpy as np
+
 from ..spiel_types import *
 
 _POS_THRESH = 1e-8
@@ -88,3 +90,43 @@ def hedge(
         policy[action] = new_weight
     for action in policy:
         policy[action] /= sum_weights
+
+
+def _external_regret_vector(policy: Sequence[Probability], losses: Sequence[float]):
+    policy, losses = map(np.asarray, (policy, losses))
+    expected_loss = np.dot(policy, losses)
+    return expected_loss - losses
+
+
+def external_regret(
+    policy: Sequence[Sequence[Probability]],
+    losses: Sequence[Sequence[float]],
+    horizon: Optional[int] = None,
+):
+    if horizon is None:
+        horizon = min(len(policy), len(losses))
+
+    regret_vector = np.zeros((len(policy[0]),))
+    for t in range(horizon):
+        regret_vector += _external_regret_vector(policy[t], losses[t])
+    return np.max(regret_vector)
+
+
+def _internal_regret_matrix(policy: Sequence[Probability], losses: Sequence[float]):
+    policy, losses = map(lambda x: np.asarray(x).reshape(-1, 1), (policy, losses))
+    # entry i,j in the matrix corresponds to the value policy[i] * (loss[i] - loss[j])
+    return policy * (losses - np.tile(losses.flatten(), reps=(policy.shape[0], 1)))
+
+
+def internal_regret(
+    policy: Sequence[Sequence[Probability]],
+    losses: Sequence[Sequence[float]],
+    horizon: Optional[int] = None,
+):
+    if horizon is None:
+        horizon = min(len(policy), len(losses))
+
+    regret_matrix = np.zeros((len(policy[0]), len(policy[0])))
+    for t in range(horizon):
+        regret_matrix += _internal_regret_matrix(policy[t], losses[t])
+    return np.max(regret_matrix)
